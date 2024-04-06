@@ -12,90 +12,44 @@ Version A.00.01   April 2024
 
 This document describes the use of the ASM32 Assembler for the VCPU-32. The ASM32 Assembly Language represents machine language instructions symbolically, and permits declaration of addresses symbolically as well. The Assembler's function is to translate an assembly language program, stored in a source file, into machine language.
 
-
-
 As the concept for the VCPU-32 is heavily influenced by Hewlett Packards PA_RISC architecture, the following reference manual follows the structure of the PA RISC Assmebler manual.
-
-
 
 For details about the VCPU-32 architecture please refer to 
 
-
-
 _VCPU-32 System Architecture and instructions Set Reference_
-
-
-
-
 
 ## Assembler Features
 
 The Assembler provides a number of features to make assembly language programming convenient. These features include:
 
-
-
-
-
 - **Mnemonic Instructions:**  
+Each machine instruction is represented by a mnemonic operation code, which is easier to remember than the binary machine language operation code. The operation code, together with operands, directs the Assembler to output a binary machine instruction to the object file.
 
-Each machine instruction is represented by a mnemonic operation code, which is easier to remember than the binary machine language operation code. The operation code,
-
-together with operands, directs the Assembler to output a binary machine instruction to the object file.
-
-
-
-- **Symbolic Addresses:**   
-
+- **Symbolic Addresses:**
 You can select a symbol to refer to the address of a location in virtual memory. The address is often referred to as the value of the symbol, which should not be confused with the value of the memory locations at that address. 
 
-
-
 - **Symbolic Constants:**  
-
 A symbol can also be selected to stand for an integer constant.
 
-
-
-
-
 - **Expressions:**  
-
 Arithmetic expressions can be formed from symbolic addresses and constants, integer constants, and arithmetic operators. Expressions involving only symbolic and integer constants, or the difference between two symbolic adresses, defined in the current module, are called Symbolic Constants. They can be used wherever an integer constant can be used. Expressions involving the sum or difference of a symbolic address and an absolute expression are called address expressions. The constant part of an expression, the part that does not refer to symbolic adresses, can use parenthesized subexpressions to alter operator precedence.
 
 
 
 - **Storage Allocation:**  
-
-In addition to encoding machine language instructions symbolically, storage may be initialized to constant values or simply reserved. Symbolic addresses and labels can be
-
-associated with these memory locations.
-
-
-
-
-
+In addition to encoding machine language instructions symbolically, storage may be initialized to constant values or simply reserved. Symbolic addresses and labels can be associated with these memory locations.
 
 
 ## Program Structure
 
-
-
 An assembly language program is a sequence of statements. There are three classes of statements:
 
+**Instructions**  
+represent a single machine instruction in symbolic form. 
 
 
-
-
-**Instructions** represent a single machine instruction in symbolic form. 
-
-
-
-**Pseudo-operations** cause the Assembler to initialize or reserve one or more words of storage for data, rather than machine instructions. 
-
-
-
-**Directives** communicate information about the program to the Assembler, but do not generally cause the Assembler to output any machine instructions. 
-
+**Directives**   
+communicate information about the program to the Assembler or cause the Assembler to initialize or reserve one or more words of storage for data
 
 
 An assembly statement contains four fields:
@@ -116,21 +70,11 @@ Each of these fields is optional. However the operands field cannot appear witho
 
 The **label** field is used to associate a symbolic address with an instruction or data location, or to define a symbolic constant using the .EQU, or .REG directives. This field is optional for all but a few statement types. If a label appears on a line by itself, or with a comment only, the label is associated with the next address within the same subspace and location counter.
 
-
-
 A **comment** is starting with a **;**. All text after the comment until eond of line is ignored by the assembler.
-
-
-
-
 
 ## Symbols and Constants
 
-
-
 Both addresses and constants can be represented symbolically. Labels represent a symbolic address except when the label is on an .EQU or .REG  directive. If the label is on an .EQU or .REG directive, the label represents a symbolic constant. 
-
-
 
 Symbols are composed of 
 
@@ -142,37 +86,17 @@ Symbols are composed of
 
 - underscores (_). 
 
-
-
 A symbol needs to begin with a letter.
-
-
 
 The Assembler considers uppercase and lowercase letters in symbols _not distinct_. The mnemonics for operation codes, directives, and pseudo-operations can be written in either case. 
 
-
-
-The length of a symbol name is restricted to 32.
-
-
-
-The name of a symbol needs to be unique within a scope, This means it can not occur twice or more within an adressable range. 
-
-
+The length of a symbol name is restricted to 32. The name of a symbol needs to be unique within a scope, This means it can not occur twice or more within an adressable range. 
 
 Integer constants can be written in decimal, octal, or hexadecimal notation, as in the C language.
 
-
-
-
-
 ## Register and Register Mnemonics
 
-
-
 The VCPU-32 features 3 types of registers. 
-
-
 
 - 16 general register R0 - R15
 
@@ -180,19 +104,11 @@ The VCPU-32 features 3 types of registers.
 
 - 32 control register C0 - C31
 
-
-
 Data is loaded from memory into general registers and stored into memory from general registers. Arithmetic and logical operations are performed on the contents of the general registers.
-
-
 
 Some additional predefined register mnemonics are provided based on the standard procedure-calling convention.
 
-
-
 ### General Register Mnemonics
-
-
 
 | Register | Mnemonic | Description |
 | -------- | ----------------- | ----------- |
@@ -222,13 +138,7 @@ Some additional predefined register mnemonics are provided based on the standard
 
 
 
-Arithmetic expressions are often valuable in writing assembly code. The
-
-Assembler allows expressions involving integer constants, symbolic
-
-constants, and symbolic addresses. These terms can be combined with
-
-the standard arithmetic operators. 
+Arithmetic expressions are often valuable in writing assembly code. The Assembler allows expressions involving integer constants, symbolic constants, and symbolic addresses. These terms can be combined with the standard arithmetic operators. 
 
 
 
@@ -331,9 +241,7 @@ Reserves a block of data storage
 
 
 
-The name of the identifier to which the Assembler
-
-assigns to the block.
+The name of the identifier to which the Assembler assigns to the block.
 
 
 
@@ -369,9 +277,7 @@ Reserves 8 bits (a byte) of storage and initializes it to the given value.
 
 
 
-The name of the identifier to which the Assembler
-
-assigns to the byte.
+The name of the identifier to which the Assembler assigns to the byte.
 
 
 
@@ -463,9 +369,7 @@ Assigns an expression to an identifier.
 
 
 
-The name of the identifier to which the Assembler
-
-assigns the expression.
+The name of the identifier to which the Assembler assigns the expression.
 
 
 
@@ -481,9 +385,7 @@ An integer expression. The Assembler evaluates the expression, which must be abs
 
 
 
-The Assembler prohibits the use of relocatable symbols (instruction
-
-labels) and imported symbols as components of an .EQU expression.
+The Assembler prohibits the use of relocatable symbols (instruction labels) and imported symbols as components of an .EQU expression.
 
 
 
@@ -507,9 +409,7 @@ Reserves 16 bits (a half word) of storage and initializes it to the given value.
 
 
 
-The name of the identifier to which the Assembler
-
-assigns to the half-byte.
+The name of the identifier to which the Assembler assigns to the half-byte.
 
 
 
@@ -549,15 +449,11 @@ A user-defined name of the structure. The structure is closed by  **.ENDRECORD**
 
 
 
-	leaf .RECORD 
-
-		.WORD backward
-
-		.WORD forward
-
-		.WORD pointer
-
-	.ENDRECORD   ; a data structure with 3 fields, 12 bytes
+	leaf    .RECORD 
+		    .WORD   backward
+		    .WORD   forward
+		    .WORD   pointer
+    	    .ENDRECORD   ; a data structure with 3 fields, 12 bytes
 
 
 
@@ -601,9 +497,7 @@ Must be one of the predefined Assembler registers or a previously defined user-d
 
 
 
-Reserves the appropriate amount of storage and initializes it to the given string.
-
-It appends a zero byte to the data. (C-Language-Style String)
+Reserves the appropriate amount of storage and initializes it to the given string. It appends a zero byte to the data. (C-Language-Style String)
 
 
 
@@ -619,9 +513,7 @@ It appends a zero byte to the data. (C-Language-Style String)
 
 
 
-The name of the identifier to which the Assembler
-
-assigns to the string.
+The name of the identifier to which the Assembler assigns to the string.
 
 
 
@@ -653,9 +545,7 @@ Reserves 32 bits (a  word) of storage and initializes it to the given value.
 
 
 
-The name of the identifier to which the Assembler
-
-assigns to the word.
+The name of the identifier to which the Assembler assigns to the word.
 
 
 
