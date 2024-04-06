@@ -205,53 +205,26 @@ Forces location counter to the next largest multiple of the supplied alignment v
 
 **Syntax**
 
-
-
     .ALIGN [boundary]
 
 
-
-**Parameter** boundary
-
-
-
+__boundary__  
 An integer value for the byte boundary to which you want to advance the location counter. The Assembler advances the location counter to that boundary. Permissible values must be a power of 2 and can range from one to 4096. The default value is 4.
-
-
 
 ## .BLOCK Directive
 
-
-
 Reserves a block of data storage
-
-
-
-
 
 **Syntax**
 
-
-
     symbolic_name  .BLOCK [num_bytes]
 
-
-
-**Parameter**   symbolic_name
-
-
-
+__symbolic_name__  
 The name of the identifier to which the Assembler assigns to the block.
 
 
-
-**Parameter**   num_bytes
-
-
-
+__num_bytes__  
 An integer value for the number of bytes you want to reserve. Permissible values range from zero to 0x3FFFFFFF. The default value is zero.
-
-
 
 <### to be clarified>
 
@@ -259,70 +232,34 @@ An integer value for the number of bytes you want to reserve. Permissible values
 
 ## .BYTE Directive
 
-
-
 Reserves 8 bits (a byte) of storage and initializes it to the given value.
 
-
-
 **Syntax**
-
-
 
     symbolic_name  .BYTE [init_value]
 
-
-
-**Parameter**   symbolic_name
-
-
-
+__symbolic_name__  
 The name of the identifier to which the Assembler assigns to the byte.
 
-
-
-**Parameter**   init_value
-
-
-
+__init_value__  
 Either a decimal, octal, or hexadecimal number or a sequence of ASCII characters, surrounded by quotation marks. If you omit the initializing value, the Assembler initializes the area to zero.
-
-
 
 ## .CODE Directive
 
-
-
 Indicates the start of the instruction area. After this directive  the LOCATION counter for instruction is active. The area ends either with a .DATA or an .END directive.
 
-
-
-
-
 **Syntax**
-
-
 
      .CODE 
 
-	
 
 ## .DATA Directive
 
-
-
 Indicates the start of the data area. After this directive  ths the LOCATION counter for data is active. The area ends either with a .CODE or an .END directive.
-
-
-
-
 
 **Syntax**
 
-
-
      .DATA 
-
 
 
 ## .END Directive
