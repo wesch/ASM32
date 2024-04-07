@@ -18,6 +18,17 @@ For details about the VCPU-32 architecture please refer to
 
 _VCPU-32 System Architecture and instructions Set Reference_
 
+
+## Typogaphical Conventions
+
+This document uses the following symbolic conventions.
+
+[ ] In syntax formats, square brackets enclose optional
+items.
+
+{ } In syntax formats, braces enclose a list from which you
+must choose an item.
+
 ## Assembler Features
 
 The Assembler provides a number of features to make assembly language programming convenient. These features include:
@@ -33,8 +44,6 @@ A symbol can also be selected to stand for an integer constant.
 
 - **Expressions:**  
 Arithmetic expressions can be formed from symbolic addresses and constants, integer constants, and arithmetic operators. Expressions involving only symbolic and integer constants, or the difference between two symbolic adresses, defined in the current module, are called Symbolic Constants. They can be used wherever an integer constant can be used. Expressions involving the sum or difference of a symbolic address and an absolute expression are called address expressions. The constant part of an expression, the part that does not refer to symbolic adresses, can use parenthesized subexpressions to alter operator precedence.
-
-
 
 - **Storage Allocation:**  
 In addition to encoding machine language instructions symbolically, storage may be initialized to constant values or simply reserved. Symbolic addresses and labels can be associated with these memory locations.
@@ -120,11 +129,7 @@ Some additional predefined register mnemonics are provided based on the standard
 | R14 | RL | Return Link |
 | R15 | SP | Stack Pointer |
 
-
-
 ### Segment Register Mnemonics
-
-
 
 | Register | Mnemonic | Description |
 | -------- | ----------------- | ----------- |
@@ -132,15 +137,9 @@ Some additional predefined register mnemonics are provided based on the standard
 | S6 | JS | Job Segment |
 | S7 | SS | System Segment |
 
-
-
 ## Expressions
 
-
-
 Arithmetic expressions are often valuable in writing assembly code. The Assembler allows expressions involving integer constants, symbolic constants, and symbolic addresses. These terms can be combined with the standard arithmetic operators. 
-
-
 
 | Operator | Operation |
 | - | - |
@@ -149,32 +148,17 @@ Arithmetic expressions are often valuable in writing assembly code. The Assemble
 | * | Integer multiplication |
 | / | Integer division (result is truncated) |
 
-
-
 ## Parenthesized Subexpressions
-
-
 
 The constant term of an expression may contain parenthesized subexpressions that alter the order of evaluation from the precedence normally associated with arithmetic operators.
 
-
-
 For example 
-
-
 
     LDI R5, data5 + ( data7 - 4 ) * data0
 
-
-
-
-
 # Assembler Directives
 
-
-
 Assembler directives allow you to take special programming actions during the assembly process. The directive names begin with a period (.) to distinguish them from machine instruction opcodes.
-
 
 
 | Directive | Function |
@@ -182,31 +166,24 @@ Assembler directives allow you to take special programming actions during the as
 | .ALIGN | Forces location counter to the next largest multiple of the supplied alignment value. |
 | .BLOCK | Reserves a block of data storage |
 | .BYTE | Reserves 8 bits (a byte) of storage and initializes it to the given value. |
-| .CODE | Indicates the start of the instruction area |
-| .DATA | Indicates the start of the data area |
 | .END | Terminates an assembly language program. |
 | .EQU | Assigns an expression to an identifier. |
 | .HALF | Reserves 16 bits (a half word) of storage and initializes it to the given value. |
 | .REG | Attaches a type and number to a user-defined register name.|
+| .SECTION | Defines the begin of a new section |
+| .SEGMENT | Defines the begin of a new segment |
 | .STRING | Reserves the appropriate amount of storage and initializes it to the given string.|
+| .VERSION | TInserts the specified string into the current object module as a user-defined version identification string. |
 | .WORD | Reserves 32 bits (a word) of storage and initializes it to the given value. |
-
-
-
 
 
 ## .ALIGN Directive
 
-
-
 Forces location counter to the next largest multiple of the supplied alignment value.
-
-
 
 **Syntax**
 
     .ALIGN [boundary]
-
 
 __boundary__  
 An integer value for the byte boundary to which you want to advance the location counter. The Assembler advances the location counter to that boundary. Permissible values must be a power of 2 and can range from one to 4096. The default value is 4.
@@ -217,7 +194,7 @@ Reserves a block of data storage
 
 **Syntax**
 
-    symbolic_name  .BLOCK [num_bytes]
+    [symbolic_name]  .BLOCK [num_bytes]
 
 __symbolic_name__  
 The name of the identifier to which the Assembler assigns to the block.
@@ -229,14 +206,13 @@ An integer value for the number of bytes you want to reserve. Permissible values
 <### to be clarified>
 
 
-
 ## .BYTE Directive
 
 Reserves 8 bits (a byte) of storage and initializes it to the given value.
 
 **Syntax**
 
-    symbolic_name  .BYTE [init_value]
+    [symbolic_name]  .BYTE [init_value]
 
 __symbolic_name__  
 The name of the identifier to which the Assembler assigns to the byte.
@@ -244,250 +220,171 @@ The name of the identifier to which the Assembler assigns to the byte.
 __init_value__  
 Either a decimal, octal, or hexadecimal number or a sequence of ASCII characters, surrounded by quotation marks. If you omit the initializing value, the Assembler initializes the area to zero.
 
-## .CODE Directive
-
-Indicates the start of the instruction area. After this directive  the LOCATION counter for instruction is active. The area ends either with a .DATA or an .END directive.
-
-**Syntax**
-
-     .CODE 
-
-
-## .DATA Directive
-
-Indicates the start of the data area. After this directive  ths the LOCATION counter for data is active. The area ends either with a .CODE or an .END directive.
-
-**Syntax**
-
-     .DATA 
-
-
 ## .END Directive
-
-
 
 Terminates an assembly language program.
 
-
-
-
-
 **Syntax**
-
-
 
     .END 
 
-
-
 This directive is the last statement in an assembly language program. If a source file lacks an .END directive, the Assembler terminates the program when it encounters the end of the file.
-
-
 
 ## .EQU Directive
 
-
-
 Assigns an expression to an identifier.
 
-
-
-
-
 **Syntax**
-
-
 
     symbolic_name    .EQU    value
 
-
-
-**Parameter**   symbolic_name
-
-
-
+__symbolic_name__  
 The name of the identifier to which the Assembler assigns the expression.
 
+__value__  
+An integer expression. The Assembler evaluates the expression, which must be a symbolic constant and assigns this value to symbolic_name.
 
-
-**Parameter**  value
-
-
-
-An integer expression. The Assembler evaluates the expression, which must be absolute, and assigns this value to symbolic_name.
-
-
-
-**NOTE**
-
-
-
-The Assembler prohibits the use of relocatable symbols (instruction labels) and imported symbols as components of an .EQU expression.
-
-
+**NOTE**  
+The Assembler prohibits the use of symbolic adresses and imported symbols as components of an .EQU expression.
 
 ## .HALF Directive
 
-
-
 Reserves 16 bits (a half word) of storage and initializes it to the given value.
-
-
 
 **Syntax**
 
+    [symbolic_name]   .HALF [init_value]
 
-
-    symbolic_name  .HALF [init_value]
-
-
-
-**Parameter**   symbolic_name
-
-
-
+__symbolic_name__  
 The name of the identifier to which the Assembler assigns to the half-byte.
 
-
-
-**Parameter**   init_value
-
-
-
+__init_value__  
 Either a decimal, octal, or hexadecimal number or a sequence of ASCII characters, surrounded by quotation marks. If you omit the initializing value, the Assembler initializes the area to zero.
-
-
 
 ## .RECORD Directive
 
+Defines a structure name where fields are part of the structure. Elements of the structure can be used as symbolic adresses by 
 
-
-Defines a structure name where fields are part of the structure.
-
-
+    name_of_record.field_name
 
 **Syntax**
 
+      symbolic_name     .RECORD 
 
-
-      symbolic_name .RECORD 
-
-	  
-
-**Parameter**   symbolic_name 
-
-
-
+__symbolic_name__  
 A user-defined name of the structure. The structure is closed by  **.ENDRECORD**.
 
-
-
 **Example**
+    
+    ; Define a structure with 3 fields in total 12 bytes
 
+	leaf        .RECORD 
+		back    .WORD   
+		forw    .WORD   
+	    pointer .WORD   
+    	        .ENDRECORD   
 
+    ; use element of the structure in an instruction
 
-	leaf    .RECORD 
-		    .WORD   backward
-		    .WORD   forward
-		    .WORD   pointer
-    	    .ENDRECORD   ; a data structure with 3 fields, 12 bytes
-
-
-
-
+        ADDW R3,leaf.forw
+    
 
 ## .REG Directive
 
-
-
 Attaches a type and number to a user-defined register name.
-
-
 
 **Syntax**
 
+    symbolic_name    .REG register
 
-
-    symbolic_name    .REG [register]
-
-
-
-**Parameter**   symbolic_name 
-
-
-
+__symbolic_name__  
 A user-defined register name.
 
+__register__  
+Must be one of the predefined Assembler registers or a previously defined user-defined register name.
 
+## .SECTION Directive
 
-**Parameter**   register
+Defines the begin of  section.
 
+**Syntax**
 
+    [symbolic_name]    .SECTION type [,BASE=register])  
 
-Must be one of the predefined Assembler registers or a previously defined user-defined register name
+__symbolic_name__  
+A user-defined name of the section. The section is closed by  **.ENDSECTION**.
 
+__type__  
+defines the type of the section. Valid values are 
+ - GLOBAL       contains global variables
+ - CODE         contains instructions
+ - CONST        contains constatnts/literals which can't be changed
 
+__BASE__  
+Defines the base register to build the adress of elemnts within this section. 
 
+** Example**
 
+    ; Define a section for global variables using DP as base register
+    
+    MY_GLOBAL   .SECTION GLOBAL,BASE=DP   
+    F_1         .WORD
+    F_2         .WORD
+    F_3         .BYTE
+                .ENDSECTION
+
+## .SEGMENT Directive
+
+Defines teh begin of a segment.
+
+**Syntax**
+
+    [symbolic_name]    .SEGMENT type
+
+__symbolic_name__  
+A user-defined name of the segemnt. The section is closed by  **.ENDSEGMENT**.
+
+__type__  
+defines the type of the section. Valid values are 
+ - PRIVATE       contains  variables
+ - TEXT          contains instructions and constants/literals
 
 ## .STRING Directive
 
-
-
 Reserves the appropriate amount of storage and initializes it to the given string. It appends a zero byte to the data. (C-Language-Style String)
-
-
 
 **Syntax**
 
+    [symbolic_name]  .STRING "init_value"
 
-
-    symbolic_name .STRING ["init_value"]
-
-
-
-**Parameter**   symbolic_name
-
-
-
+__symbolic_name__  
 The name of the identifier to which the Assembler assigns to the string.
 
-
-
-**Parameter**   init_value
-
-
-
+__init_value__  
 A sequence of ASCII characters, surrounded by quotation marks. A string can contain up to 256 characters. The enclosing quotation marks are not stored.
 
+## .VERSION Directive
 
+The .VERSION directive places the designated string in the current
+object module for version identification.
+
+**Syntax**
+
+         .VERSION "info_string"
+
+__info_string__  
+A sequence of ASCII characters, surrounded by quotation marks. A string can contain up to 256 characters. The enclosing quotation marks are not stored.
 
 ## .WORD Directive
 
-
-
 Reserves 32 bits (a  word) of storage and initializes it to the given value.
-
-
 
 **Syntax**
 
+    [symbolic_name]  .WORD [init_value]
 
-
-    symbolic_name  .WORD [init_value]
-
-
-
-**Parameter**   symbolic_name
-
-
-
+__symbolic_name__  
 The name of the identifier to which the Assembler assigns to the word.
 
-
-
-**Parameter**   init_value
-
-
-
+__init_value__  
 Either a decimal, octal, or hexadecimal number or a sequence of ASCII characters, surrounded by quotation marks. If you omit the initializing value, the Assembler initializes the area to zero.
