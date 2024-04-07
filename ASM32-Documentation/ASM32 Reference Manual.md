@@ -148,13 +148,40 @@ Arithmetic expressions are often valuable in writing assembly code. The Assemble
 | * | Integer multiplication |
 | / | Integer division (result is truncated) |
 
-## Parenthesized Subexpressions
+### Parenthesized Subexpressions
 
 The constant term of an expression may contain parenthesized subexpressions that alter the order of evaluation from the precedence normally associated with arithmetic operators.
 
 For example 
 
     LDI R5, data5 + ( data7 - 4 ) * data0
+
+### Expressions for symbolic constants
+
+Expression for symbolic constants provide finaly a numeric value which will be part of the instruction. Therefore also the difference of two symbolic adresses can be provided (e.g. to calculate a length of a set of fields).
+
+**Example**
+
+    Field1  .word
+    Field2  .word
+    Field3  .word
+
+    DISTANCE    .EQU    Field3 - Field1 ; equals 8 (bytes)
+
+### Expressions for symbolic adresses
+
+Expression for symbolic adress provide an adress of an object. Therefore a symbolic adress can be part of an expression. 
+
+**Please ensure that the result of the expression is a valid adress.**
+
+**Example**
+
+    Field1  .word
+    Field2  .word
+
+    offset  .EQU    4
+
+    ADDW    R3,Field1+offset   ; will add Field2
 
 # Assembler Directives
 
