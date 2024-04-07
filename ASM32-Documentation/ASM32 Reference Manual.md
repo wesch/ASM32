@@ -79,7 +79,7 @@ Each of these fields is optional. However the operands field cannot appear witho
 
 The **label** field is used to associate a symbolic address with an instruction or data location, or to define a symbolic constant using the .EQU, or .REG directives. This field is optional for all but a few statement types. If a label appears on a line by itself, or with a comment only, the label is associated with the next address within the same subspace and location counter.
 
-A **comment** is starting with a **;**. All text after the comment until eond of line is ignored by the assembler.
+A **comment** is starting with a **;**. All text after the comment until end of line is ignored by the assembler.
 
 ## Symbols and Constants
 
@@ -172,7 +172,10 @@ Expression for symbolic constants provide finaly a numeric value which will be p
 
 Expression for symbolic adress provide an adress of an object. Therefore a symbolic adress can be part of an expression. 
 
-**Please ensure that the result of the expression is a valid adress.**
+> [!NOTE]  
+> **Please ensure that the result of the expression is a valid adress.**
+
+
 
 **Example**
 
@@ -306,7 +309,7 @@ A user-defined name of the structure. The structure is closed by  **.ENDRECORD**
     ; Define a structure with 3 fields in total 12 bytes
 
 	leaf        .RECORD 
-		back    .WORD   
+	    back    .WORD   
 		forw    .WORD   
 	    pointer .WORD   
     	        .ENDRECORD   
