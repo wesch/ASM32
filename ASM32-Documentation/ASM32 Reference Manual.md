@@ -97,7 +97,7 @@ Symbols are composed of
 
 A symbol needs to begin with a letter.
 
-The Assembler considers uppercase and lowercase letters in symbols _not distinct_. The mnemonics for operation codes, directives, and pseudo-operations can be written in either case. 
+The Assembler considers uppercase and lowercase letters in symbols _distinct_. The mnemonics for operation codes, directives, and pseudo-operations can be written in either case. 
 
 The length of a symbol name is restricted to 32. The name of a symbol needs to be unique within a scope, This means it can not occur twice or more within an adressable range. 
 
