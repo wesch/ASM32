@@ -139,14 +139,20 @@ Some additional predefined register mnemonics are provided based on the standard
 
 ## Expressions
 
-Arithmetic expressions are often valuable in writing assembly code. The Assembler allows expressions involving integer constants, symbolic constants, and symbolic addresses. These terms can be combined with the standard arithmetic operators. 
+Arithmetic expressions are often valuable in writing assembly code. The Assembler allows expressions involving integer constants, symbolic constants, and symbolic addresses. These terms can be combined with the standard arithmetic operators. The tabke below shows all valid operators and their priority
 
-| Operator | Operation |
-| - | - |
-| + | Integer addition |
-| - | Integer subtraction |
-| * | Integer multiplication |
-| / | Integer division (result is truncated) |
+
+| Operator | Operation | Prio |
+| - | - | - |
+| ! | logical not | 9 |
+| * | Integer multiplication | 8 |
+| / | Integer division (result is truncated) | 8 |
+| + | Integer addition | 7 |
+| - | Integer subtraction | 7 |
+| << | left shift | 6 |
+| >> | right shift | 6 |
+| && | logical and | 5 |
+| \|\| | logical or | 5 |
 
 ### Parenthesized Subexpressions
 
