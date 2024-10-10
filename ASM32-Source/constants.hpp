@@ -18,7 +18,7 @@
 #define FALSE 0
 
 
-#define VERSION "A.00.02.006"
+#define VERSION "A.00.02.007"
 
 
 /* Addresses: */
@@ -61,22 +61,27 @@
 
 enum {
     NONE,
-    IDENTIFIER,
-    NUM,
-    COMMA,
-    COLON,
-    DOT,
-    LPAREN,
-    RPAREN,
-    COMMENT,
-    DIRECTIVE,
-    OPCODE,
-    LABEL,
-    MINUS,
-    PLUS,
-    MUL,
-    DIV,
-    EOL
+    T_IDENTIFIER,
+    T_NUM,
+    T_COMMA,
+    T_COLON,
+    T_DOT,
+    T_LPAREN,
+    T_RPAREN,
+    T_COMMENT,
+    T_DIRECTIVE,
+    T_OPCODE,
+    T_LABEL,
+    T_MINUS,
+    T_PLUS,
+    T_MUL,
+    T_DIV,
+    T_NEG,
+    T_MOD,
+    T_OR,
+    T_AND,
+    T_XOR,
+    T_EOL
 };
 
 // -------------------------  enum AST node types  --------------------*
@@ -186,6 +191,36 @@ const struct directInfo {
 
 };
 
+// --------------------------------------------------------------------------------
+// Table of other reserved words
+// --------------------------------------------------------------------------------
+
+const struct reservedInfo {
+    char resWord[12];
+} resWordTab[] = {
+
+    { "IF" },
+    { "ELSE" },
+    { "R0" },
+    { "R1" },
+    { "R2" },
+    { "R3" },
+    { "R4" },
+    { "R5" },
+    { "R6" },
+    { "R7" },
+    { "R8" },
+    { "R9" },
+    { "R10" },
+    { "R11" },
+    { "R12" },
+    { "R13" },
+    { "R14" },
+    { "R15" },
+    { "R16" },
+
+};
+
 
 // --------------------------------------------------------------------------------
 // Table of OpCode mnemonics
@@ -272,3 +307,5 @@ const struct opCodeInfo {
     { "STH",     0xC4010000 , ST },
     { "STW",     0xC4000000 , ST },
 };
+
+

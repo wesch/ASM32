@@ -145,12 +145,60 @@ void print_sym(SymNode* node, int depth) {
 }
 
 
+void SkipToEOL() {
+    while (tokTyp != T_EOL) {
+        NextToken();
+    }
+
+}
+
 // --------------------------------------------------------------------------------
 // Check reserved word
 //  checks if token is a reserved word
 // --------------------------------------------------------------------------------
 
 bool CheckReservedWord() {
+
+    // Check Opcodes
+
+    StrToUpper(label);
+
+    int num_Opcode = (sizeof(opCodeTab) / sizeof(opCodeTab[0]));
+    int i;
+
+    for (i = 0; i < num_Opcode; i++) {
+
+        if (strcmp(label, opCodeTab[i].mnemonic) == 0) {		// opCode found
+
+            return FALSE;
+        }
+    }
+
+    // Check Dirctives
+
+    int num_dircode = (sizeof(dirCodeTab) / sizeof(dirCodeTab[0]));
+
+    for (i = 0; i < num_dircode; i++) {
+
+        if (strcmp(label, dirCodeTab[i].directive) == 0) {		// dircode found
+
+            return FALSE;
+        }
+
+    }
+
+    // Check other reserved words
+
+    int num_resWord = (sizeof(resWordTab) / sizeof(resWordTab[0]));
+
+    for (i = 0; i < num_resWord; i++) {
+
+        if (strcmp(label, resWordTab[i].resWord) == 0) {		// reserved word found
+
+            return FALSE;
+        }
+
+    }
     return TRUE;
 }
 
@@ -225,86 +273,224 @@ bool CheckGenReg() {
 
 
 }
+int ParseFactor() {
+    int n = 0;
 
-void GetValue() {
+    if (tokTyp == T_LPAREN) {
 
-    if (tokTyp == NUM) {
+        NextToken(); 
+        n = ParseLogicalExpression(); 
 
-        strcpy(token_old, token);
-        tokTyp_old = tokTyp;
+        if (tokTyp == T_RPAREN) {
 
-        NextToken();                                         // COMMA or EOL
-
-        if (tokTyp == EOL) {                                 // must be immediate
-
-            strcpy(token, token_old);
-            tokTyp = tokTyp_old;
-            if (tokTyp == NUM)
-                tokTyp = NONE;
-            return;
+            NextToken(); 
+            return n; 
         }
     }
-}
+    else if (tokTyp == T_NEG) {
 
-// --------------------------------------------------------------------------------
-//      GetExpression
-//          the actual token contains first token of the expression
-//          the next token is an oparation +-*/
-//          expression ends by EOL
-///              or by ( if the token before ( is no operation 
-//          expression contains NUM, IDENTIFIER, LPAREN, RPAREN, PLUS, MINUS, MUL, DIV
-// 
-// --------------------------------------------------------------------------------
-void GetExpression() {
-
-
-    printf("%s ", token_old);
-    // PrintSymbolTokenCode(tokTyp);
-    printf(" ");
-
-    while (tokTyp != EOL) {
-
-        tokTyp_old = tokTyp;
-        strcpy(token_old, token);
-        NextToken();
-        if (tokTyp == LPAREN || tokTyp == EOL) {
-            
-
-
-            if (tokTyp_old == RPAREN || tokTyp_old == NUM || tokTyp_old == IDENTIFIER) {
-
-                break;
-            }
+        n = ~n;
+    }
+    else {
+        
+        if (tokTyp == T_NUM) {
+ 
         }
-
-        if (tokTyp == IDENTIFIER) {
+        else if (tokTyp == T_IDENTIFIER) {
 
             if (searchSymbol(scopeTab[currentScopeLevel], token)) {
 
                 if (strcmp(symFunc, "EQU") == NULL) {
-                    printf("%s\t", symValue);
+
+                    strcpy(token, symValue);
+                }
+                else
+                {
+                    sprintf(errmsg, "Invalid symbol name %s at line %d position %d", token, lineNr, column);
+                    ProcessError(errmsg);
                 }
             }
-        }
-        else if (tokTyp == NUM) {
-            printf("%s ", token);
-        }
-        
-        else {
-
-            if (tokTyp == PLUS || 
-                tokTyp == MINUS || 
-                tokTyp == MUL || 
-                tokTyp == DIV ||
-                tokTyp == LPAREN ||
-                tokTyp == RPAREN) {
-                
-                PrintSymbolTokenCode(tokTyp); 
+            else
+            {
+                sprintf(errmsg, "Invalid symbol name %s at line %d position %d", token, lineNr, column);
+                ProcessError(errmsg);
             }
-            printf(" ");
-        }
 
+        }
+        n = atoi(token);
+ 
+        NextToken();
     }
+    return n; 
+}
+
+int ParseTerm() {
+    int first, second;
+
+    first = ParseFactor(); 
+
+    for (;;) {
+        if (tokTyp == T_MUL) {
+
+            NextToken(); 
+            second = ParseFactor(); 
+            first *= second; 
+        }
+        else if (tokTyp == T_DIV) {
+
+            NextToken(); 
+            second = ParseFactor(); 
+            first /= second; 
+        }
+        else if (tokTyp == T_MOD) {
+
+            NextToken(); 
+            second = ParseFactor(); 
+            first %= second; 
+        }
+        else {
+            return first; 
+        }
+    }
+}
+
+int ParseExpression() {
+    int first, second;
+
+    first = ParseTerm(); 
+
+    for (;;) {
+        if (tokTyp == T_PLUS) {
+
+            NextToken(); 
+            second = ParseTerm(); 
+            first += second; 
+        }
+        else if (tokTyp == T_MINUS) {
+
+            NextToken(); 
+            second = ParseTerm(); 
+            first -= second; 
+        }
+        else {
+            return first; 
+        }
+    }
+}
+
+int ParseLogicalExpression() {
+
+    int first, second;
+
+    first = ParseExpression();
+
+    for (;;) {
+        if (tokTyp == T_OR) {
+
+            NextToken();
+            second = ParseExpression();
+            first |= second;
+        }
+        if (tokTyp == T_AND) {
+
+            NextToken();
+            second = ParseExpression();
+            first &= second;
+        }
+        if (tokTyp == T_XOR) {
+
+            NextToken();
+            second = ParseExpression();
+            first ^= second;
+        }
+        else {
+            return first; 
+        }
+    }
+}
+
+
+// --------------------------------------------------------------------------------
+//      GetExpression
+//          expression starts with MINUS,LPAREN
+//          expression ends with COMMA, EOL or LPAREN if pre toketype was not a operation
+        
+///          
+//          expression contains NUM, IDENTIFIER, LPAREN, RPAREN, PLUS, MINUS, MUL, DIV
+// 
+// --------------------------------------------------------------------------------
+
+void Evaluate() {
+    printf("[");
+
+    if (tokTyp == T_IDENTIFIER) {
+        if (searchSymbol(scopeTab[currentScopeLevel], token)) {
+
+            if (strcmp(symFunc, "EQU") == NULL) {
+                strcpy(token, symValue);
+
+            }
+            else
+            {
+                sprintf(errmsg, "Invalid symbol name %s at line %d position %d", token, lineNr, column);
+                ProcessError(errmsg);
+            }
+        }
+        else
+        {
+            sprintf(errmsg, "Invalid symbol name %s at line %d position %d", token, lineNr, column);
+            ProcessError(errmsg);
+        }
+    }
+    printf("%s", token);
+    while (!(tokTyp == T_COMMA || tokTyp == T_EOL)) {
+        strcpy(token_old, token);
+        tokTyp_old = tokTyp;
+        NextToken();
+        if (tokTyp == T_LPAREN) {
+            if (!(tokTyp_old == T_PLUS ||
+                tokTyp_old == T_MINUS ||
+                tokTyp_old == T_MUL ||
+                tokTyp_old == T_DIV )) {
+                break;
+            }
+            // PrintSymbolTokenCode(tokTyp);
+        }
+        else if (tokTyp == T_NUM) {
+            
+        }
+        else if (tokTyp == T_IDENTIFIER) {
+            if (searchSymbol(scopeTab[currentScopeLevel], token)) {
+
+                if (strcmp(symFunc, "EQU") == NULL) {
+                    strcpy(token, symValue);
+
+                }
+                else
+                {
+                    sprintf(errmsg, "Invalid symbol name %s at line %d position %d", token, lineNr, column);
+                    ProcessError(errmsg);
+                }
+            }
+            else
+            {
+                sprintf(errmsg, "Invalid symbol name %s at line %d position %d", token, lineNr, column);
+                ProcessError(errmsg);
+            }
+        }
+        else if (tokTyp == T_LPAREN ||
+            tokTyp == T_RPAREN ||
+            tokTyp == T_MINUS ||
+            tokTyp == T_PLUS ||
+            tokTyp == T_MUL ||
+            tokTyp == T_DIV) {
+
+            // PrintSymbolTokenCode(tokTyp);
+        }
+        printf("%s", token);
+    }
+    printf("] ");
+
 }
 
 // --------------------------------------------------------------------------------
@@ -330,22 +516,27 @@ void PrintTokenCode(int i) {
     switch (i) {
 
     case NONE:          printf("NONE"); break;
-    case IDENTIFIER:    printf("IDENTIFIER"); break;
-    case NUM:           printf("NUM"); break;
-    case COMMA:         printf("COMMA"); break;
-    case COLON:         printf("COLON"); break;
-    case DOT:           printf("DOT"); break;
-    case LPAREN:        printf("LPAREN"); break;
-    case RPAREN:        printf("RPAREN"); break;
-    case COMMENT:       printf("COMMENT"); break;
-    case DIRECTIVE:     printf("DIRECTIVE"); break;
-    case OPCODE:        printf("OPCODE"); break;
-    case LABEL:         printf("LABEL"); break;
-    case MINUS:         printf("MINUS"); break;
-    case PLUS:          printf("PLUS"); break;
-    case MUL:           printf("MUL"); break;
-    case DIV:           printf("DIV"); break;
-    case EOL:		    printf("EOL"); break;
+    case T_IDENTIFIER:  printf("IDENTIFIER"); break;
+    case T_NUM:         printf("NUM"); break;
+    case T_COMMA:       printf("COMMA"); break;
+    case T_COLON:       printf("COLON"); break;
+    case T_DOT:         printf("DOT"); break;
+    case T_LPAREN:      printf("LPAREN"); break;
+    case T_RPAREN:      printf("RPAREN"); break;
+    case T_COMMENT:     printf("COMMENT"); break;
+    case T_DIRECTIVE:   printf("DIRECTIVE"); break;
+    case T_OPCODE:      printf("OPCODE"); break;
+    case T_LABEL:       printf("LABEL"); break;
+    case T_MINUS:       printf("MINUS"); break;
+    case T_PLUS:        printf("PLUS"); break;
+    case T_MUL:         printf("MUL"); break;
+    case T_DIV:         printf("DIV"); break;
+    case T_NEG:         printf("NEG"); break;
+    case T_MOD:         printf("MOD"); break;
+    case T_OR:          printf("OR"); break;
+    case T_AND:         printf("AND"); break;
+    case T_XOR:         printf("XOR"); break;
+    case T_EOL:		    printf("EOL"); break;
     case EOF:		    printf("EOF"); break;
 
     default:		    printf("-----  unknown symbol  -----");
@@ -361,15 +552,20 @@ void PrintSymbolTokenCode(int i) {
 
     switch (i) {
 
-    case LPAREN:        printf("("); break;
-    case RPAREN:        printf(")"); break;
-    case MINUS:         printf("-"); break;
-    case PLUS:          printf("+"); break;
-    case MUL:           printf("*"); break;
-    case DIV:           printf("/"); break;
-    case EOL:		    printf("EOL"); break;
-    case EOF:		    printf("EOF"); break;
-    case IDENTIFIER:    printf("ID"); break;
+    case T_LPAREN:        printf("("); break;
+    case T_RPAREN:        printf(")"); break;
+    case T_MINUS:         printf("-"); break;
+    case T_PLUS:          printf("+"); break;
+    case T_MUL:           printf("*"); break;
+    case T_DIV:           printf("/"); break;
+    case T_NEG:           printf("~"); break;
+    case T_MOD:           printf("%%"); break;
+    case T_OR:            printf("|"); break;
+    case T_AND:           printf("&"); break;
+    case T_XOR:           printf("^"); break;
+    case T_EOL:		      printf("EOL"); break;
+    case EOF:		      printf("EOF"); break;
+    case T_IDENTIFIER:    printf("ID"); break;
 
     default:		    printf("-----  unknown symbol  -----");
     }
@@ -384,51 +580,6 @@ void ProcessLabel() {
     strcpy(label, token_old);
 }
 
-// -------------------------------------------------------------------------------- 
-//          Parser ProcessInstruction
-// --------------------------------------------------------------------------------
-
-void ProcessInstruction() {
-    printf("%d I %s\t", lineNr, token_old);
-
-    int i = 0;
-    char        option[MAX_WORD_LENGTH];        // option value 
-    char        opCode[MAX_WORD_LENGTH];        // Opcode
-    int         OpType;                         // contains opCodetab.instr_type
-
-
-
-    strcpy(opCode, token_old);
-
-    StrToUpper(opCode);
-
-    int num_Opcode = (sizeof(opCodeTab) / sizeof(opCodeTab[0]));
-    bool opCode_found = FALSE;
-
-    for (i = 0; i < num_Opcode; i++) {
-    
-        if (strcmp(opCode, opCodeTab[i].mnemonic) == 0) {		// opCode found
-        
-            opCode_found = TRUE;
-            break;
-        }
-    }
-    if (opCode_found == FALSE) {
-
-        printf("E: Line %d Column %d \tInvalid Opcode %s", lineNr, column, opCode);
-
-        while (TRUE) {
-
-            NextToken();
-
-            if (tokTyp == EOL) {
-                return;
-            }
-        }
-    }
-
-    OpType = opCodeTab[i].instrType;
-
 // --------------------------------------------------------------------------------
 //  Opcode ADD,ADC,SUB,SBC,AND,OR,XOR,CMP,CMPU
 //  Format:
@@ -438,332 +589,203 @@ void ProcessInstruction() {
 //      OP[W | H | B]<.XX> regR, ofs(regB)
 // 
 // --------------------------------------------------------------------------------
+void ParseModInstr() {
 
-    if (OpType == ADD ||
-        OpType == ADC ||
-        OpType == SUB ||
-        OpType == SBC ||
-        OpType == AND ||
-        OpType == OR ||
-        OpType == XOR ||
-        OpType == CMP ||
-        OpType == CMPU) {
+    char        option[MAX_WORD_LENGTH];        // option value 
 
-        if (tokTyp == DOT) {                                   // check for option
+    if (tokTyp == T_DOT) {                                   // check for 1st option
 
-            memset(option, 0, MAX_WORD_LENGTH);
-            NextToken();
+        memset(option, 0, MAX_WORD_LENGTH);
+        NextToken();
 
-            if (tokTyp == IDENTIFIER) {
+        if (tokTyp == T_IDENTIFIER) {
 
-                printf("OPT %s\t", token);
-            }
-            NextToken();
+            printf("OPT1 %s ", token);
         }
+        NextToken();
+    }
+    if (tokTyp == T_DOT) {                                   // check for 2nd option
 
-        // Here is always regR 
+        memset(option, 0, MAX_WORD_LENGTH);
+        NextToken();
 
-        if (tokTyp == IDENTIFIER) {   
+        if (tokTyp == T_IDENTIFIER) {
 
-            if (CheckGenReg() == TRUE) {
+            printf("OPT2 %s ", token);
+        }
+        NextToken();
+    }
 
-                printf("regR %s\t", token);
-            }
-            else
-            {
-                sprintf(errmsg, "Invalid register name %s at line %d position %d", token, lineNr, column);
-                ProcessError(errmsg);
-            }
+    // Here is always regR 
 
+    if (tokTyp == T_IDENTIFIER) {
+
+        if (CheckGenReg() == TRUE) {
+
+            printf("regR %s ", token);
         }
         else
         {
-            sprintf(errmsg, "Unexpected token %s at line %d position %d", token, lineNr, column);
+            sprintf(errmsg, "Invalid register name %s at line %d position %d", token, lineNr, column);
             ProcessError(errmsg);
-        }
-
-        // Here is always a comma
-
-        NextToken();             
-        if (tokTyp != COMMA) {
-            sprintf(errmsg, "Unexpected token %s at line %d position %d", token, lineNr, column);
-            ProcessError(errmsg);
-        }
-
-        NextToken();                                             
-        
-        // Here is optional a minus sign
-
-        if (tokTyp == MINUS) {
-            PrintSymbolTokenCode(tokTyp);
-            is_negative = TRUE;
-            NextToken();
-        }
-
-        // Here is either register or a value (num, symbol, expression)
-
-        mode = 9;                                           // Mode not set
-
-        if (tokTyp == IDENTIFIER) {
-
-            if (CheckGenReg() == TRUE) {
-
-                printf("regA %s\t", token);
-                mode = 1;
-            }
-            else if (searchSymbol(scopeTab[currentScopeLevel], token)) {
-
-                if (strcmp(symFunc, "EQU") == NULL) {
-                    printf("%s\t", symValue);
-                    strcpy(token, symValue);
-                }
-            }
-            else
-            {
-                sprintf(errmsg, "Invalid symbol name %s at line %d position %d", token, lineNr, column);
-                ProcessError(errmsg);
-            }
-
-        }
-        else if (tokTyp == NUM) {
-
-        }
-        else if (tokTyp == LPAREN) {
-            if (tokTyp == LPAREN) {
-                PrintSymbolTokenCode(tokTyp);
-            }
-        }
-        strcpy(token_old, token);
-        tokTyp_old = tokTyp;
-        
-        if (mode != 1) {
-         
-            GetExpression();
-        }
-        else {
-            NextToken();
-        }
-        if (tokTyp == EOL) {
-
-            strcpy(token, token_old);
-            tokTyp = tokTyp_old;
-        //    printf("sym %s\t", token);
-            printf("M-0\n");
             return;
         }
+    }
+    else
+    {
+        sprintf(errmsg, "Unexpected token %s at line %d position %d", token, lineNr, column);
+        ProcessError(errmsg);
+        return;
+    }
 
-        // If mode = 1 we had a register which may be mode 1 or mode 2 else we have mode 3
+    // Here is always a comma
 
-        if (mode == 1) {
 
-            
-            if (tokTyp == COMMA) {
+    NextToken();
+    if (tokTyp != T_COMMA) {
+        sprintf(errmsg, "Unexpected token %s at line %d position %d", token, lineNr, column);
+        ProcessError(errmsg);
+    }
+
+    // this is the common area for all modes
+
+    NextToken();
+
+    mode = 0;
+    is_negative = FALSE;
+    
+    if (tokTyp == T_MINUS) {
+
+        is_negative = TRUE;
+        NextToken();
+    }
+
+
+    if (tokTyp == T_IDENTIFIER) {
+
+        if (CheckGenReg() == TRUE) {
+
+            printf("regA %s ", token);
+            NextToken();
+            if (tokTyp == T_EOL) {
+                mode = 1;
+                printf("M-%d\n", mode);
+                return;
+            }
+            else if (tokTyp == T_COMMA) {
                 mode = 1;
             }
-            else if (tokTyp == LPAREN) {
+            else if (tokTyp == T_LPAREN) {
                 mode = 2;
             }
-            else {
-                sprintf(errmsg, "Invalid token at line %d position %d", lineNr, column);
-                ProcessError(errmsg);
-            }
+        }
+    }
+    if (mode == 0) {
+ //       Evaluate();
+        value = ParseLogicalExpression();
+            
+        if (is_negative == TRUE) {
+            value = -value;
+        }
+        printf("[%d]", value);
+        if (tokTyp == T_EOL) {
+
+            mode = 0;
+            printf("M-%d\n", mode);
+            return;
+        }
+        else if (tokTyp == T_LPAREN) {
+
+            mode = 3;
+        }
+    }
+    NextToken();
+
+    if (CheckGenReg() == TRUE) {
+
+        printf("regB %s ", token);
+        if (mode == 1) {
             NextToken();
-            if (CheckGenReg() == TRUE) {
-                printf("regB %s\t", token);
-                printf("M-%d\n", mode);
-            }
-            else
-            {
+            if (tokTyp != T_EOL) {
                 sprintf(errmsg, "Unexpected token %s at line %d position %d", token, lineNr, column);
                 ProcessError(errmsg);
             }
-            
-
         }
-        else
-        {
-
-        }
-
-        // == ABSPRUNG
-
-        return;
-
-        // =======================================================
-
-
-
-        if (tokTyp == NUM ) {
-
-            strcpy(token_old, token);
-            tokTyp_old = tokTyp;
-
-            NextToken();                                         // COMMA or EOL
-
-            if (tokTyp == EOL) {                                 // must be immediate
-
-                strcpy(token, token_old);
-                tokTyp = tokTyp_old;
-                if (tokTyp == NUM)
-                    tokTyp = NONE;
-                printf("%s\t", token);
-                printf("M-0\n");
-                return;
-            }
-            else if (tokTyp == LPAREN) {
-
-                strcpy(token, token_old);
-                tokTyp = tokTyp_old;
-
-                if (tokTyp == NUM) {
-
-                    printf("%s\t", token);
-                    NextToken();
-                    printf("regb %s\t", token);
-                    printf("M-3\n");
-                    NextToken();                                    // RPAREN
-                    return;
-                }
-
-            }
-            else if (tokTyp == PLUS || tokTyp == MINUS || tokTyp == MUL || tokTyp == DIV ) {
-
-                GetExpression();
-
-                if (tokTyp == LPAREN) {
-
-                    NextToken();
-
-                    if (CheckGenReg() == TRUE) {
-
-                        printf("regb %s\t", token);
-                        printf("M-3\n");
-                        NextToken();                                    // RPAREN
-                        return;
-                    }
-                    else
-                    {
-                        sprintf(errmsg, "Invalid register name %s at line %d position %d", token, lineNr, column);
-                        ProcessError(errmsg);
-                    }
-                    
- 
-                }
-                else {
-                    printf("M-0\n");
-                    return;
-                }
-            }
-
-        }
-        else if (tokTyp == IDENTIFIER) {
-
-            if (CheckGenReg() == TRUE) {
-
-                printf("regA %s\t", token);
-
-               
-            }
-            else if (searchSymbol(scopeTab[currentScopeLevel], token)) {
-
-                if (strcmp(symFunc, "EQU") == NULL) {
-                    printf("%s\t", symValue);
-                }
-            }
-
-            else
-            {
-                sprintf(errmsg, "Invalid symbol name %s at line %d position %d", token, lineNr, column);
+        else if (mode == 2 || mode == 3) {
+            NextToken();
+            if (tokTyp != T_RPAREN) {
+                sprintf(errmsg, "Unexpected token %s at line %d position %d", token, lineNr, column);
                 ProcessError(errmsg);
             }
-
-            strcpy(token_old, token);
-            tokTyp_old = tokTyp;
-            NextToken();
-            
-            if (tokTyp == EOL) {
-                printf("M-0\n");
-                return;
-            }
-
-            if (tokTyp == COMMA) {                                  // --> M1 two register
-
-                NextToken();
-                if (tokTyp == EOL) {
-                    sprintf(errmsg, "Unexpected end of line  %d position %d",  lineNr, column);
-                    ProcessError(errmsg);
-                }
-                if (CheckGenReg() == TRUE) {
-
-                    printf("regB %s\t", token);
-                    printf("M-1\n");
-                    return;
-                }
-                else
-                {
-                    sprintf(errmsg, "Invalid register name %s at line %d position %d", token, lineNr, column);
-                    ProcessError(errmsg);
-                }
-
-            }
-            else if (tokTyp == LPAREN) {                            // --> M2 register indexed
-
-                strcpy(token, token_old);
-                tokTyp = tokTyp_old;
-                NextToken();
-
-                if (CheckGenReg() == TRUE) {
-
-                    printf("regB %s\t", token);
-                    printf("M-2\n");
-                    NextToken();                                    // RPAREN
-                    return;
-                }
-                else
-                {
-                    sprintf(errmsg, "Invalid register name %s at line %d position %d", token, lineNr, column);
-                    ProcessError(errmsg);
-                }
-            }
-            else if (tokTyp == EOL) {
-
-                strcpy(token, token_old);
-                tokTyp = tokTyp_old;
-                printf("sym %s\t", token);
-                printf("M-0\n");
-                return;
-            }
-            else if (tokTyp == PLUS || tokTyp == MINUS || tokTyp == MUL || tokTyp == DIV) {
-
-                GetExpression();
-
-                if (tokTyp == LPAREN) {
-
-                    NextToken();
-
-                    if (CheckGenReg() == TRUE) {
-
-                        printf("regb %s\t", token);
-                        printf("M-3\n");
-                        NextToken();                                    // RPAREN
-                        return;
-                    }
-                    else
-                    {
-                        sprintf(errmsg, "Invalid register name %s at line %d position %d", token, lineNr, column);
-                        ProcessError(errmsg);
-                    }
-                }
-                else {
-                    printf("M-0\t");
-                    return;
-                }
-            }
         }
-    } // END ADD,SUB,.....
 
+        printf("M-%d\n", mode);
+        return;
 
+    }
+    return;
+
+} // END ADD,SUB,.....
+// -------------------------------------------------------------------------------- 
+//          Parser ProcessInstruction
+// --------------------------------------------------------------------------------
+
+void ProcessInstruction() {
+
+    printf("%03d I %s ", lineNr, token_old);
+
+    int i = 0;
+
+    char        opCode[MAX_WORD_LENGTH];        // Opcode
+    int         OpType;                         // contains opCodetab.instr_type
+
+    strcpy(opCode, token_old);
+
+    StrToUpper(opCode);
+
+    int num_Opcode = (sizeof(opCodeTab) / sizeof(opCodeTab[0]));
+    bool opCode_found = FALSE;
+
+    for (i = 0; i < num_Opcode; i++) {
+
+        if (strcmp(opCode, opCodeTab[i].mnemonic) == 0) {		// opCode found
+
+            opCode_found = TRUE;
+            break;
+        }
+    }
+    if (opCode_found == FALSE) {
+
+        sprintf(errmsg, "Invalid Opcode %s at line %d position %d", opCode, lineNr, column );
+        ProcessError(errmsg);
+
+        return; 
+    }
+
+    OpType = opCodeTab[i].instrType;
+
+    switch (OpType) {
+
+    case ADD:
+    case ADC:
+    case SUB:
+    case SBC:
+    case AND:
+    case OR:
+    case XOR:
+    case CMP:
+    case CMPU:      ParseModInstr(); break;
+
+    default: printf("not yet implemented\n");
+
+    }
+    SkipToEOL();
+    return;
 }
+
+
+
+
 
 // -------------------------------------------------------------------------------- 
 //          Parser ProcessDirective
@@ -804,7 +826,7 @@ void ProcessDirective() {
 
             NextToken();
 
-            if (tokTyp == EOL) {
+            if (tokTyp == T_EOL) {
                 return;
             }
         }
@@ -819,7 +841,7 @@ void ProcessDirective() {
             }
             else
             {
-                sprintf(errmsg, "Scopelevel can not be reduced below program level", token);
+                strcpy(errmsg, "Scopelevel can not be reduced below program level");
                 ProcessError(errmsg);
 
             }

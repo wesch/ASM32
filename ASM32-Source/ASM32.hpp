@@ -14,6 +14,7 @@ extern int         tokTyp;                         // type of token see enum
 extern int         tokTyp_old;
 extern int         numToken;                       // numeric value of token
 extern int         mode;
+extern int         value;
 extern char        label[MAX_WORD_LENGTH];
 extern int         ind;                        // index in sourceline for tokenizing
 extern int         j;                          // inhdex to fill token
@@ -45,8 +46,8 @@ extern char symValue[50];             // Wert in Symtab
 //      token list
 // --------------------------------------------------------------------------------
 
-typedef struct tokenList {
-    size_t lineNumber;
+struct tokenList {
+    int     lineNumber;
     int     column;
     int     tokTyp;                                 // type of token
     char    token[MAX_WORD_LENGTH];                 // token value
@@ -61,7 +62,7 @@ extern struct tokenList* ptr_t;                    // regular pointer
 //      Symboltable
 // --------------------------------------------------------------------------------
 
-typedef struct SymNode {
+struct SymNode {
     ScopeType type;             // Art des Scopes
     int scopeLevel;             // Verschachtelungstiefe des Scopes
     char scopeName[50];         // Name des Scope
@@ -73,20 +74,20 @@ typedef struct SymNode {
 
     struct SymNode** children;  // Zeiger auf die Kinder
     int child_count;            // Anzahl Kinder
-} SymNode;
+} ;
 
 // --------------------------------------------------------------------------------
 //      Abstract Syntax Tree
 // --------------------------------------------------------------------------------
 
-typedef struct ASTNode {
+ struct ASTNode {
     NodeType type;
     char* value;
     int linenr;
     int column;
     struct ASTNode** children;
     int child_count;
-} ASTNode;
+} ;
 
 // --------------------------------------------------------------------------------
 //      Function Prototypes 
@@ -108,13 +109,19 @@ void    GetToken();
 
 // -- parser.cpp
 bool    checkGenReg();
-void    GetExpression();
+void    Evaluate();
 void    NextToken();
 void    PrintSymbolTokenCode(int i);
 void    PrintTokenCode(int i);
 void    ProcessDirective();
 void    ProcessInstruction();
 void    ProcessLabel();
+void    ParseModInstr();
+void    SkipToEOL();
+int     ParseExpression();
+int     ParseLogicalExpression();
+int     ParseTerm();
+int     ParseFactor();
 
 void addDirective(ScopeType type, char* label, char* func, const char* value, int linenr);
 void addScope(ScopeType type, char* label, char* func, const char* value, int linenr);

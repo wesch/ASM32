@@ -24,6 +24,7 @@ char        token_old[MAX_WORD_LENGTH];     // save previous token
 int         tokTyp;                         // type of token see enum
 int         tokTyp_old;                     // save previous tokTyp
 int         numToken;                       // numeric value of token
+int         value;
 int         mode;                           // mode for arithmetic functions
 char        label[MAX_WORD_LENGTH];         // actual label
 int         ind = 0;                        // index in sourceline for tokenizing
@@ -109,7 +110,7 @@ int main(int argc, char** argv) {
         }
 
 
-        while (tokTyp != EOL) {
+        while (tokTyp != T_EOL) {
             GetToken();
             NewTokenList();
             ptr_t->lineNumber = lineNr;
@@ -166,19 +167,19 @@ int main(int argc, char** argv) {
 
         strcpy(token_old, ptr_t->token);
         
-        if (ptr_t->tokTyp == IDENTIFIER) {
+        if (ptr_t->tokTyp == T_IDENTIFIER) {
 
             NextToken();
-            if (tokTyp == COLON) {
+            if (tokTyp == T_COLON) {
                 is_label = TRUE;
             }
             else {
                 is_instruction = TRUE;
             }
         }
-        else if (ptr_t->tokTyp == DOT) {
+        else if (ptr_t->tokTyp == T_DOT) {
             NextToken();
-            if (tokTyp == IDENTIFIER) {
+            if (tokTyp == T_IDENTIFIER) {
                 strcpy(token_old, ptr_t->token);
                 is_directive = TRUE;
             }
@@ -199,7 +200,7 @@ int main(int argc, char** argv) {
 
 
 
-        if (ptr_t->tokTyp == EOL) {             // here we are at the end of the statement
+        if (ptr_t->tokTyp == T_EOL) {             // here we are at the end of the statement
  //           printf("\n");
         }
         

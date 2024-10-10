@@ -46,12 +46,14 @@ void NewTokenList() {
 
 void PrintTokenList() {
 
+    // return;
+
     struct tokenList* ptr_t = start_t;
     printf("===== Token List ======\n");
 
     while (ptr_t != NULL) {
 
-        printf("%d\t%d\t%s\t", (size_t*)ptr_t->lineNumber, ptr_t->column, ptr_t->token);
+        printf("%d\t%d\t%s\t", ptr_t->lineNumber, ptr_t->column, ptr_t->token);
         PrintTokenCode(ptr_t->tokTyp);
         printf("\n");
         ptr_t = ptr_t->next;
@@ -64,7 +66,7 @@ void PrintTokenList() {
 
 void GetToken() {
     int         ch;                             // character for tokenizer
-    token[0] = '\0';
+    strcpy(token,"\0");
     j = 0;
     tokTyp = NONE;
 
@@ -75,62 +77,101 @@ void GetToken() {
 
         if (ch == '\n') {
 
-            tokTyp = EOL;
+            tokTyp = T_EOL;
+            strcpy(token, "EOL");
             break;
         }
         else if (ch == ';') {
 
-            tokTyp = EOL;
+            tokTyp = T_EOL;
+            strcpy(token, "EOL");
             break;
         }
         else if (ch == '.') {
 
-            tokTyp = DOT;
+            tokTyp = T_DOT;
+            strcpy(token, ".");
             break;
         }
         else if (ch == ',') {
 
-            tokTyp = COMMA;
+            tokTyp = T_COMMA;
+            strcpy(token, ",");
             break;
         }
         else if (ch == ':') {
 
-            tokTyp = COLON;
+            tokTyp = T_COLON;
+            strcpy(token, ":");
             break;
         }
         else if (ch == '-') {
 
-            tokTyp = MINUS;
+            tokTyp = T_MINUS;
+            strcpy(token, "-");
             break;
         }
         else if (ch == '+') {
 
-            tokTyp = PLUS;
+            tokTyp = T_PLUS;
+            strcpy(token, "+");
             break;
         }
         else if (ch == '*') {
 
-            tokTyp = MUL;
+            tokTyp = T_MUL;
+            strcpy(token, "*");
             break;
         }
         else if (ch == '/') {
 
-            tokTyp = DIV;
+            tokTyp = T_DIV;
+            strcpy(token, "/");
             break;
         }
+        else if (ch == '~') {
+            tokTyp = T_NEG;
+            strcpy(token, "~");
+            break;
+        }
+        else if (ch == '%') {
+            tokTyp = T_MOD;
+            strcpy(token, "%");
+            break;
+        }
+        else if (ch == '|') {
+            tokTyp = T_OR;
+            strcpy(token, "|");
+            break;
+        }
+        else if (ch == '&') {
+            tokTyp = T_AND;
+            strcpy(token, "%");
+            break;
+        }
+        else if (ch == '^') {
+            tokTyp = T_XOR;
+            strcpy(token, "^");
+            break;
+        }
+
+
+
 
         else if (ch == '(') {
 
-            tokTyp = LPAREN;
+            tokTyp = T_LPAREN;
+            strcpy(token, "(");
             break;
         }
         else if (ch == ')') {
-            tokTyp = RPAREN;
+            tokTyp = T_RPAREN;
+            strcpy(token, ")");
             break;
         }
         else if (isalpha(ch)) {                         // alphanumeric 
             column = ind;
-            tokTyp = IDENTIFIER;
+            tokTyp = T_IDENTIFIER;
             while (isalpha(ch) || isdigit(ch)) {
 
                 token[j] = ch;
@@ -144,10 +185,8 @@ void GetToken() {
         }
         else if (isdigit(ch)) {                         // numeric value
 
-       
-
             column = ind;
-            tokTyp = NUM;
+            tokTyp = T_NUM;
             if (ch == '0' && sl[ind + 1] == 'x') {
                 token[j] = ch;
                 token[j + 1] = sl[ind + 1];

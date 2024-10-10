@@ -51,7 +51,8 @@ void StrToUpper(char* _str) {
 
 
 void ProcessError(const char* msg) {
-    printf("E>%d:%d\t%s\n", lineNr, column, msg);
+    printf("Err> %s\n", msg);
+    SkipToEOL();
 }
 
 void PrintDebug(const char* msg) {
