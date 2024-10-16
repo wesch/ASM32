@@ -18,7 +18,7 @@
 #define FALSE 0
 
 
-#define VERSION "A.00.02.007"
+#define VERSION "A.00.02.008"
 
 
 /* Addresses: */
@@ -92,6 +92,7 @@ typedef enum {
     NODE_DIRECTIVE,
     NODE_OPERATION,
     NODE_OPERAND,
+    NODE_OPTION,
     NODE_MODE,
     NODE_DATA_DECLARATION,
     NODE_EXPRESSION,

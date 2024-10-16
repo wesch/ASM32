@@ -49,7 +49,9 @@ void PrintTokenList() {
     // return;
 
     struct tokenList* ptr_t = start_t;
-    printf("===== Token List ======\n");
+
+    printf("\n\Token List\n");
+    printf("----------------------------\n");
 
     while (ptr_t != NULL) {
 
@@ -76,55 +78,46 @@ void GetToken() {
         column = ind;
 
         if (ch == '\n') {
-
             tokTyp = T_EOL;
             strcpy(token, "EOL");
             break;
         }
         else if (ch == ';') {
-
             tokTyp = T_EOL;
             strcpy(token, "EOL");
             break;
         }
         else if (ch == '.') {
-
             tokTyp = T_DOT;
             strcpy(token, ".");
             break;
         }
         else if (ch == ',') {
-
             tokTyp = T_COMMA;
             strcpy(token, ",");
             break;
         }
         else if (ch == ':') {
-
             tokTyp = T_COLON;
             strcpy(token, ":");
             break;
         }
         else if (ch == '-') {
-
             tokTyp = T_MINUS;
             strcpy(token, "-");
             break;
         }
         else if (ch == '+') {
-
             tokTyp = T_PLUS;
             strcpy(token, "+");
             break;
         }
         else if (ch == '*') {
-
             tokTyp = T_MUL;
             strcpy(token, "*");
             break;
         }
         else if (ch == '/') {
-
             tokTyp = T_DIV;
             strcpy(token, "/");
             break;
@@ -154,12 +147,7 @@ void GetToken() {
             strcpy(token, "^");
             break;
         }
-
-
-
-
         else if (ch == '(') {
-
             tokTyp = T_LPAREN;
             strcpy(token, "(");
             break;
@@ -170,6 +158,7 @@ void GetToken() {
             break;
         }
         else if (isalpha(ch)) {                         // alphanumeric 
+
             column = ind;
             tokTyp = T_IDENTIFIER;
             while (isalpha(ch) || isdigit(ch)) {
@@ -202,6 +191,7 @@ void GetToken() {
             }
             else {
                 while (isdigit(ch)) {
+
                     token[j] = ch;
                     j++;
                     ind++;

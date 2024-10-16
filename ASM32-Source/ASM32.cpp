@@ -29,6 +29,7 @@ int         mode;                           // mode for arithmetic functions
 char        label[MAX_WORD_LENGTH];         // actual label
 int         ind = 0;                        // index in sourceline for tokenizing
 int         j;                              // inhdex to fill token
+char        opCode[MAX_WORD_LENGTH];        // Opcode
 
 char        errmsg[MAX_ERROR_LENGTH];       // Error 
 bool        is_label;
@@ -68,6 +69,19 @@ SymNode* directive = NULL;
 char symFunc[50];           // Directive in Symtab 
 char symValue[50];             // Wert in Symtab
 
+ASTNode* ASTprogram = NULL;
+ASTNode* ASTinstruction = NULL;
+ASTNode* ASToperation = NULL;
+ASTNode* ASTop1 = NULL;
+ASTNode* ASTop2 = NULL;
+ASTNode* ASTop3 = NULL;
+ASTNode* ASTop4 = NULL;
+ASTNode* ASTlabel = NULL;
+ASTNode* ASTmode = NULL;
+ASTNode* ASTopt1 = NULL;
+ASTNode* ASTopt2 = NULL;
+
+
 // --------------------------------------------------------------------------------
 //      Sub Routines  
 // --------------------------------------------------------------------------------
@@ -79,18 +93,21 @@ char symValue[50];             // Wert in Symtab
 
 int main(int argc, char** argv) {
 
+    // First version no options only one source file
 
-    // -------------------------------------------------------------------------------- 
-    //  FOR TEST ONLY. Source File: test.s 
-    // --------------------------------------------------------------------------------
-
-    strcpy(SourceFileName, "C:\\Users\\User\\source\\repos\\ASM32\\x64\\Debug\\Test.s");
-
-    if (SourceFileName == NULL) {
-        FatalError("No source file given");
+    if (argc != 2) {
+        printf("Usage: %s <filename>\n", argv[0]);
+        return 1;
     }
+    if (argv[1] == NULL) {
+        printf("Usage: %s <filename>\n", argv[0]);
+        return 1;
+    }
+    strcpy(SourceFileName, argv[1]);
     OpenSourceFile();
+
     printf("\n\nAssembler start %s\n", VERSION);
+    ASTprogram = Create_ASTnode(NODE_PROGRAM, SourceFileName, 0);
 
     // --------------------------------------------------------------------------------
     //  Lexer
@@ -140,20 +157,23 @@ int main(int argc, char** argv) {
 
 
 
-    printf("===== Parser ======\n");
+
+
+    printf("\n\nParser\n");
+    printf("----------------------------\n");
 
     // Globaler Scope
     currentScopeLevel = GLOBAL;
     strcpy(label, "GLOBAL");
     strcpy(symFunc, "");
     strcpy(symValue, "");
-    global = create_node(GLOBAL, label, symFunc, symValue, 0);
+    global = Create_SYMnode(GLOBAL, label, symFunc, symValue, 0);
     scopeTab[currentScopeLevel] = global;
 
     // ADD Programm P1 Scope
     strcpy(label, "P1");
     strcpy(symFunc, "PROGRAM");
-    addScope(PROGRAM, label, symFunc, SourceFileName, 0);
+    AddScope(PROGRAM, label, symFunc, SourceFileName, 0);
     currentScopeType = PROGRAM;
 
 
@@ -186,15 +206,15 @@ int main(int argc, char** argv) {
         }
         if (is_label == TRUE) {
 
-            ProcessLabel();
+            ParseLabel();
         }
         if (is_instruction == TRUE) {
             tokTyp = ptr_t->tokTyp;
-            ProcessInstruction();
+            ParseInstruction();
         }
         if (is_directive == TRUE) {
 
-            ProcessDirective();
+            ParseDirective();
         }
 
 
@@ -209,8 +229,11 @@ int main(int argc, char** argv) {
 
     printf("\n\nSYMBOL TABLE\n");
     printf("----------------------------\n");
+    PrintSYM(global, 0);
 
-    print_sym(global, 0);
+    printf("\n\nAbstract Syntax Tree\n");
+    printf("----------------------------\n");
+    PrintAST(ASTprogram, 0);
 
     CloseSourceFile();
     exit(0);

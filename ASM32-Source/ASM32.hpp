@@ -23,6 +23,7 @@ extern bool        is_label;
 extern bool        is_instruction;
 extern bool        is_directive;
 extern bool        is_negative;
+extern char        opCode[MAX_WORD_LENGTH];
 
 
 extern struct SymNode* scopeTab[10];
@@ -41,6 +42,19 @@ extern struct SymNode* block;
 extern struct SymNode* directive;
 extern char symFunc[50];           // Directive in Symtab 
 extern char symValue[50];             // Wert in Symtab
+
+
+extern struct ASTNode* ASTprogram;
+extern struct ASTNode* ASTinstruction;
+extern struct ASTNode* ASToperation;
+extern struct ASTNode* ASTop1;
+extern struct ASTNode* ASTop2;
+extern struct ASTNode* ASTop3;
+extern struct ASTNode* ASTop4;
+extern struct ASTNode* ASTlabel;
+extern struct ASTNode* ASTmode;
+extern struct ASTNode* ASTopt1;
+extern struct ASTNode* ASTopt2;
 
 // --------------------------------------------------------------------------------
 //      token list
@@ -83,8 +97,10 @@ struct SymNode {
  struct ASTNode {
     NodeType type;
     char* value;
+    int valnum;
     int linenr;
     int column;
+    uint32_t _binInstr;
     struct ASTNode** children;
     int child_count;
 } ;
@@ -113,9 +129,9 @@ void    Evaluate();
 void    NextToken();
 void    PrintSymbolTokenCode(int i);
 void    PrintTokenCode(int i);
-void    ProcessDirective();
-void    ProcessInstruction();
-void    ProcessLabel();
+void    ParseDirective();
+void    ParseInstruction();
+void    ParseLabel();
 void    ParseModInstr();
 void    SkipToEOL();
 int     ParseExpression();
@@ -123,14 +139,16 @@ int     ParseLogicalExpression();
 int     ParseTerm();
 int     ParseFactor();
 
-void addDirective(ScopeType type, char* label, char* func, const char* value, int linenr);
-void addScope(ScopeType type, char* label, char* func, const char* value, int linenr);
-void add_child(SymNode* parent, SymNode* child);
-SymNode* create_node(ScopeType type, char* label, char* func, const char* value, int linenr);
-void print_sym(SymNode* node, int depth);
-void searchSymAll(SymNode* node, char* label, int depth);
-void searchSymLevel(SymNode* node, char* label, int depth);
-bool searchSymbol(SymNode* node, char* label);
-
+void AddDirective(ScopeType type, char* label, char* func, const char* value, int linenr);
+void AddScope(ScopeType type, char* label, char* func, const char* value, int linenr);
+void Add_SYMchild(SymNode* parent, SymNode* child);
+SymNode* Create_SYMnode(ScopeType type, char* label, char* func, const char* value, int linenr);
+void PrintSYM(SymNode* node, int depth);
+void SearchSymAll(SymNode* node, char* label, int depth);
+void SearchSymLevel(SymNode* node, char* label, int depth);
+bool SearchSymbol(SymNode* node, char* label);
+ASTNode* Create_ASTnode(NodeType type, const char* value, int valnum);
+void Add_ASTchild(ASTNode* parent, ASTNode* child);
+void PrintAST(ASTNode* node, int depth);
 
 #endif

@@ -2,11 +2,40 @@
 #include "constants.hpp"
 #include "ASM32.hpp"
 
+// Function to create a new AST node
+ASTNode* Create_ASTnode(NodeType type, const char* value, int valnum) {
+    ASTNode* node = (ASTNode*)malloc(sizeof(ASTNode));
+    node->type = type;
+    node->value = _strdup(value);
+    node->valnum = valnum;
+    node->linenr = lineNr;
+    node->column = column;
+    node->children = NULL;
+    node->child_count = 0;
+    return node;
+}
 
+// Function to add a child node
+void Add_ASTchild(ASTNode* parent, ASTNode* child) {
+    parent->children = (ASTNode**)realloc(parent->children, sizeof(ASTNode*) * (parent->child_count + 1));
+    parent->children[parent->child_count++] = child;
+}
+
+// Function to free an AST node
+void Free_ASTnode(ASTNode* node) {
+    if (node) {
+        free(node->value);
+        for (int i = 0; i < node->child_count; i++) {
+            Free_ASTnode(node->children[i]);
+        }
+        free(node->children);
+        free(node);
+    }
+}
 
 // Function to create a new Sym_node
 
-SymNode* create_node(ScopeType type, char* label, char* func, const char* value, int linenr) {
+SymNode* Create_SYMnode(ScopeType type, char* label, char* func, const char* value, int linenr) {
 
     SymNode* node = (SymNode*)malloc(sizeof(SymNode));
 
@@ -26,7 +55,7 @@ SymNode* create_node(ScopeType type, char* label, char* func, const char* value,
 
 // Function to add a child node
 
-void add_child(SymNode* parent, SymNode* child) {
+void Add_SYMchild(SymNode* parent, SymNode* child) {
 
     parent->children = (SymNode**)realloc(parent->children, sizeof(SymNode*) * (parent->child_count + 1));
     parent->children[parent->child_count++] = child;
@@ -35,7 +64,7 @@ void add_child(SymNode* parent, SymNode* child) {
 
 // Add new Scope
 
-void addScope(ScopeType type, char* label, char* func, const char* value, int linenr) {
+void AddScope(ScopeType type, char* label, char* func, const char* value, int linenr) {
     currentScopeLevel++;
     if (currentScopeLevel > maxScopeLevel) {
         printf("Too many Scope Levels\n");
@@ -43,26 +72,26 @@ void addScope(ScopeType type, char* label, char* func, const char* value, int li
     }
     strcpy(currentScopeName, label);
     strcpy(scopeNameTab[currentScopeLevel], currentScopeName);
-    scopeTab[currentScopeLevel] = create_node(type, label, func, value, linenr);
-    add_child(scopeTab[currentScopeLevel - 1], scopeTab[currentScopeLevel]);
+    scopeTab[currentScopeLevel] = Create_SYMnode(type, label, func, value, linenr);
+    Add_SYMchild(scopeTab[currentScopeLevel - 1], scopeTab[currentScopeLevel]);
 }
 
 // Add directive and link to scope
 
-void addDirective(ScopeType type, char* label, char* func, const char* value, int linenr) {
+void AddDirective(ScopeType type, char* label, char* func, const char* value, int linenr) {
 
-    directive = create_node(type, label, func, value, linenr);
-    add_child(scopeTab[currentScopeLevel], directive);
+    directive = Create_SYMnode(type, label, func, value, linenr);
+    Add_SYMchild(scopeTab[currentScopeLevel], directive);
 
 }
 
 // Function search from actual Scopelevel up
-void searchSymAll(SymNode* node, char* label, int depth) {
+void SearchSymAll(SymNode* node, char* label, int depth) {
 
     if (!node) return;
-    if (strcmp(node->label, label) == NULL &&
+    if (strcmp(node->label, label) == 0 &&
         node->scopeLevel <= currentScopeLevel &&
-        strcmp(node->scopeName, currentScopeName) == NULL) {
+        strcmp(node->scopeName, currentScopeName) == 0) {
         //       printf("Val %s Label %s Line %d\n",node->value,label, node->linenr);
         strcpy(symFunc, node->func);
         strcpy(symValue, node->value);
@@ -71,7 +100,7 @@ void searchSymAll(SymNode* node, char* label, int depth) {
     }
     else {
         for (int i = 0; i < node->child_count; i++) {
-            searchSymAll(node->children[i], label, depth + 1);
+            SearchSymAll(node->children[i], label, depth + 1);
         }
     }
 
@@ -79,32 +108,32 @@ void searchSymAll(SymNode* node, char* label, int depth) {
 
 // Function search on actual Scopelevel
 
-void searchSymLevel(SymNode* node, char* label, int depth) {
+void SearchSymLevel(SymNode* node, char* label, int depth) {
 
     if (!node) return;
-    if (strcmp(node->label, label) == NULL &&
+    if (strcmp(node->label, label) == 0 &&
         node->scopeLevel == currentScopeLevel &&
-        strcmp(node->scopeName, currentScopeName) == NULL) {
+        strcmp(node->scopeName, currentScopeName) == 0) {
         
         symFound = TRUE;
         return;
     }
     else {
         for (int i = 0; i < node->child_count; i++) {
-            searchSymLevel(node->children[i], label, depth + 1);
+            SearchSymLevel(node->children[i], label, depth + 1);
         }
     }
 }
 
 // Funktion Symbol Suche in Symboltabelle
 
-bool searchSymbol(SymNode* node, char* label) {
+bool SearchSymbol(SymNode* node, char* label) {
 
     strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
     symFound = FALSE;
     scopeLevelSave = currentScopeLevel;
     while (symFound == FALSE) {
-        searchSymAll(scopeTab[currentScopeLevel], label, 0);
+        SearchSymAll(scopeTab[currentScopeLevel], label, 0);
         if (symFound == TRUE) {
             return TRUE;
         }
@@ -123,7 +152,7 @@ bool searchSymbol(SymNode* node, char* label) {
 }
 
 // Function to print the Symtab
-void print_sym(SymNode* node, int depth) {
+void PrintSYM(SymNode* node, int depth) {
 
     if (!node) return;
 
@@ -140,7 +169,7 @@ void print_sym(SymNode* node, int depth) {
         "Unknown", node->scopeLevel,node->label, node->func, node->value, node->linenr);
 
     for (int i = 0; i < node->child_count; i++) {
-        print_sym(node->children[i], depth + 1);
+        PrintSYM(node->children[i], depth + 1);
     }
 }
 
@@ -202,7 +231,22 @@ bool CheckReservedWord() {
     return TRUE;
 }
 
+// --------------------------------------------------------------------------------
+// Check OpCode vs. Mode
+// --------------------------------------------------------------------------------
 
+void CheckOpcodeMode() {
+    return;
+    int x = opCode[strlen(opCode) - 1];
+    if (mode == 0 || mode == 1) {
+
+
+        if (x == 'H' || x == 'W' || x == 'B') {
+            snprintf(errmsg, sizeof(errmsg), "Invalid Opcode %s mode %d combination at line %d position %d", opCode,mode, lineNr, column);
+            ProcessError(errmsg);
+        }
+    }
+}
 
 // --------------------------------------------------------------------------------
 // Check Register
@@ -213,7 +257,9 @@ bool CheckGenReg() {
 
     int reg = 0;                            // register number from checkreg = 0;
    
-    if (toupper(token[0]) == 'R') {
+    StrToUpper(token);
+    
+    if (token[0] == 'R') {
 
         if (strlen(token) == 3) {
 
@@ -241,13 +287,10 @@ bool CheckGenReg() {
 
             return FALSE;
         }
-        if (reg > 15) {
-            return FALSE;
-        }
     }
     else {
-        if (searchSymbol(scopeTab[currentScopeLevel], token)) {
-            if (strcmp(symFunc, "REG") == NULL) {
+        if (SearchSymbol(scopeTab[currentScopeLevel], token)) {
+            if (strcmp(symFunc, "REG") == 0) {
 
                 strcpy(token, symValue);
 
@@ -279,7 +322,7 @@ int ParseFactor() {
     if (tokTyp == T_LPAREN) {
 
         NextToken(); 
-        n = ParseLogicalExpression(); 
+        n = ParseExpression(); 
 
         if (tokTyp == T_RPAREN) {
 
@@ -298,21 +341,21 @@ int ParseFactor() {
         }
         else if (tokTyp == T_IDENTIFIER) {
 
-            if (searchSymbol(scopeTab[currentScopeLevel], token)) {
+            if (SearchSymbol(scopeTab[currentScopeLevel], token)) {
 
-                if (strcmp(symFunc, "EQU") == NULL) {
+                if (strcmp(symFunc, "EQU") == 0) {
 
                     strcpy(token, symValue);
                 }
                 else
                 {
-                    sprintf(errmsg, "Invalid symbol name %s at line %d position %d", token, lineNr, column);
+                    snprintf(errmsg, sizeof(errmsg), "Invalid symbol name %s at line %d position %d", token, lineNr, column);
                     ProcessError(errmsg);
                 }
             }
             else
             {
-                sprintf(errmsg, "Invalid symbol name %s at line %d position %d", token, lineNr, column);
+                snprintf(errmsg, sizeof(errmsg), "Invalid symbol name %s at line %d position %d", token, lineNr, column);
                 ProcessError(errmsg);
             }
 
@@ -348,6 +391,13 @@ int ParseTerm() {
             second = ParseFactor(); 
             first %= second; 
         }
+        else if (tokTyp == T_AND) {
+
+            NextToken();
+            second = ParseExpression();
+            first &= second;
+        }
+
         else {
             return first; 
         }
@@ -358,6 +408,9 @@ int ParseExpression() {
     int first, second;
 
     first = ParseTerm(); 
+    if (is_negative == TRUE) {
+        first = -first;
+    }
 
     for (;;) {
         if (tokTyp == T_PLUS) {
@@ -372,32 +425,13 @@ int ParseExpression() {
             second = ParseTerm(); 
             first -= second; 
         }
-        else {
-            return first; 
-        }
-    }
-}
-
-int ParseLogicalExpression() {
-
-    int first, second;
-
-    first = ParseExpression();
-
-    for (;;) {
-        if (tokTyp == T_OR) {
+        else if (tokTyp == T_OR) {
 
             NextToken();
             second = ParseExpression();
             first |= second;
         }
-        if (tokTyp == T_AND) {
-
-            NextToken();
-            second = ParseExpression();
-            first &= second;
-        }
-        if (tokTyp == T_XOR) {
+        else if (tokTyp == T_XOR) {
 
             NextToken();
             second = ParseExpression();
@@ -410,88 +444,9 @@ int ParseLogicalExpression() {
 }
 
 
-// --------------------------------------------------------------------------------
-//      GetExpression
-//          expression starts with MINUS,LPAREN
-//          expression ends with COMMA, EOL or LPAREN if pre toketype was not a operation
-        
-///          
-//          expression contains NUM, IDENTIFIER, LPAREN, RPAREN, PLUS, MINUS, MUL, DIV
-// 
-// --------------------------------------------------------------------------------
 
-void Evaluate() {
-    printf("[");
 
-    if (tokTyp == T_IDENTIFIER) {
-        if (searchSymbol(scopeTab[currentScopeLevel], token)) {
 
-            if (strcmp(symFunc, "EQU") == NULL) {
-                strcpy(token, symValue);
-
-            }
-            else
-            {
-                sprintf(errmsg, "Invalid symbol name %s at line %d position %d", token, lineNr, column);
-                ProcessError(errmsg);
-            }
-        }
-        else
-        {
-            sprintf(errmsg, "Invalid symbol name %s at line %d position %d", token, lineNr, column);
-            ProcessError(errmsg);
-        }
-    }
-    printf("%s", token);
-    while (!(tokTyp == T_COMMA || tokTyp == T_EOL)) {
-        strcpy(token_old, token);
-        tokTyp_old = tokTyp;
-        NextToken();
-        if (tokTyp == T_LPAREN) {
-            if (!(tokTyp_old == T_PLUS ||
-                tokTyp_old == T_MINUS ||
-                tokTyp_old == T_MUL ||
-                tokTyp_old == T_DIV )) {
-                break;
-            }
-            // PrintSymbolTokenCode(tokTyp);
-        }
-        else if (tokTyp == T_NUM) {
-            
-        }
-        else if (tokTyp == T_IDENTIFIER) {
-            if (searchSymbol(scopeTab[currentScopeLevel], token)) {
-
-                if (strcmp(symFunc, "EQU") == NULL) {
-                    strcpy(token, symValue);
-
-                }
-                else
-                {
-                    sprintf(errmsg, "Invalid symbol name %s at line %d position %d", token, lineNr, column);
-                    ProcessError(errmsg);
-                }
-            }
-            else
-            {
-                sprintf(errmsg, "Invalid symbol name %s at line %d position %d", token, lineNr, column);
-                ProcessError(errmsg);
-            }
-        }
-        else if (tokTyp == T_LPAREN ||
-            tokTyp == T_RPAREN ||
-            tokTyp == T_MINUS ||
-            tokTyp == T_PLUS ||
-            tokTyp == T_MUL ||
-            tokTyp == T_DIV) {
-
-            // PrintSymbolTokenCode(tokTyp);
-        }
-        printf("%s", token);
-    }
-    printf("] ");
-
-}
 
 // --------------------------------------------------------------------------------
 //      NextToken
@@ -505,6 +460,31 @@ void NextToken() {
     lineNr = ptr_t->lineNumber;
     column = ptr_t->column;
 }
+
+// Function to print the AST
+void PrintAST(ASTNode* node, int depth) {
+    if (!node) return;
+
+    for (int i = 0; i < depth; i++) {
+        printf("  ");
+    }
+
+    printf("%s: %s %d %x\n", (node->type == NODE_PROGRAM) ? "Prog     " :
+        (node->type == NODE_INSTRUCTION) ? "Instr   " :
+        (node->type == NODE_DIRECTIVE) ?   "Direct" :
+        (node->type == NODE_OPERATION) ?   "OpCode" :
+        (node->type == NODE_OPERAND) ?     "Oper  " :
+        (node->type == NODE_OPTION) ?      "Option" :
+        (node->type == NODE_MODE) ?        "Mode  " :
+        (node->type == NODE_LABEL) ?       "Label " :
+        "Unknown", node->value, node->valnum, node->valnum);
+
+    for (int i = 0; i < node->child_count; i++) {
+        PrintAST(node->children[i], depth + 1);
+    }
+}
+
+
 
 // --------------------------------------------------------------------------------
 //      PrintTokenCode (code) --> string
@@ -575,7 +555,7 @@ void PrintSymbolTokenCode(int i) {
 //          Parser ProcessLabel
 // --------------------------------------------------------------------------------
 
-void ProcessLabel() {
+void ParseLabel() {
 //    printf("LABEL %s\t", token_old);
     strcpy(label, token_old);
 }
@@ -593,14 +573,17 @@ void ParseModInstr() {
 
     char        option[MAX_WORD_LENGTH];        // option value 
 
+
+
     if (tokTyp == T_DOT) {                                   // check for 1st option
 
         memset(option, 0, MAX_WORD_LENGTH);
         NextToken();
-
         if (tokTyp == T_IDENTIFIER) {
 
             printf("OPT1 %s ", token);
+            ASTopt1 = Create_ASTnode(NODE_OPTION, token,0);
+            Add_ASTchild(ASTinstruction, ASTopt1);
         }
         NextToken();
     }
@@ -612,6 +595,8 @@ void ParseModInstr() {
         if (tokTyp == T_IDENTIFIER) {
 
             printf("OPT2 %s ", token);
+            ASTopt2 = Create_ASTnode(NODE_OPTION, token, 0);
+            Add_ASTchild(ASTinstruction, ASTopt2);
         }
         NextToken();
     }
@@ -623,17 +608,19 @@ void ParseModInstr() {
         if (CheckGenReg() == TRUE) {
 
             printf("regR %s ", token);
+            ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
+            Add_ASTchild(ASTinstruction, ASTop1);
         }
         else
         {
-            sprintf(errmsg, "Invalid register name %s at line %d position %d", token, lineNr, column);
+            snprintf(errmsg, sizeof(errmsg), "Invalid register name %s at line %d position %d", token, lineNr, column);
             ProcessError(errmsg);
             return;
         }
     }
     else
     {
-        sprintf(errmsg, "Unexpected token %s at line %d position %d", token, lineNr, column);
+        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s at line %d position %d", token, lineNr, column);
         ProcessError(errmsg);
         return;
     }
@@ -643,7 +630,7 @@ void ParseModInstr() {
 
     NextToken();
     if (tokTyp != T_COMMA) {
-        sprintf(errmsg, "Unexpected token %s at line %d position %d", token, lineNr, column);
+        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s at line %d position %d", token, lineNr, column);
         ProcessError(errmsg);
     }
 
@@ -666,10 +653,17 @@ void ParseModInstr() {
         if (CheckGenReg() == TRUE) {
 
             printf("regA %s ", token);
+            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
+            Add_ASTchild(ASTinstruction, ASTop2);
             NextToken();
             if (tokTyp == T_EOL) {
                 mode = 1;
                 printf("M-%d\n", mode);
+
+                CheckOpcodeMode();
+
+                ASTmode = Create_ASTnode(NODE_MODE, "", mode);
+                Add_ASTchild(ASTinstruction, ASTmode);
                 return;
             }
             else if (tokTyp == T_COMMA) {
@@ -681,17 +675,21 @@ void ParseModInstr() {
         }
     }
     if (mode == 0) {
- //       Evaluate();
-        value = ParseLogicalExpression();
-            
-        if (is_negative == TRUE) {
-            value = -value;
-        }
+
+        value = ParseExpression();
+           
         printf("[%d]", value);
+        ASTop2 = Create_ASTnode(NODE_OPERAND, "", value);
+        Add_ASTchild(ASTinstruction, ASTop2);
         if (tokTyp == T_EOL) {
 
             mode = 0;
             printf("M-%d\n", mode);
+
+            CheckOpcodeMode();
+
+            ASTmode = Create_ASTnode(NODE_MODE, "", mode);
+            Add_ASTchild(ASTinstruction, ASTmode);
             return;
         }
         else if (tokTyp == T_LPAREN) {
@@ -704,22 +702,30 @@ void ParseModInstr() {
     if (CheckGenReg() == TRUE) {
 
         printf("regB %s ", token);
+        ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
+        Add_ASTchild(ASTinstruction, ASTop3);
+
         if (mode == 1) {
             NextToken();
             if (tokTyp != T_EOL) {
-                sprintf(errmsg, "Unexpected token %s at line %d position %d", token, lineNr, column);
+                snprintf(errmsg, sizeof(errmsg), "Unexpected token %s at line %d position %d", token, lineNr, column);
                 ProcessError(errmsg);
             }
         }
         else if (mode == 2 || mode == 3) {
             NextToken();
             if (tokTyp != T_RPAREN) {
-                sprintf(errmsg, "Unexpected token %s at line %d position %d", token, lineNr, column);
+                snprintf(errmsg, sizeof(errmsg), "Unexpected token %s at line %d position %d", token, lineNr, column);
                 ProcessError(errmsg);
             }
         }
 
         printf("M-%d\n", mode);
+
+        CheckOpcodeMode();
+        
+        ASTmode = Create_ASTnode(NODE_MODE, "", mode);
+        Add_ASTchild(ASTinstruction, ASTmode);
         return;
 
     }
@@ -730,18 +736,17 @@ void ParseModInstr() {
 //          Parser ProcessInstruction
 // --------------------------------------------------------------------------------
 
-void ProcessInstruction() {
-
-    printf("%03d I %s ", lineNr, token_old);
+void ParseInstruction() {
 
     int i = 0;
-
-    char        opCode[MAX_WORD_LENGTH];        // Opcode
+    
     int         OpType;                         // contains opCodetab.instr_type
 
     strcpy(opCode, token_old);
 
     StrToUpper(opCode);
+
+    printf("%03d I %s ", lineNr, opCode);
 
     int num_Opcode = (sizeof(opCodeTab) / sizeof(opCodeTab[0]));
     bool opCode_found = FALSE;
@@ -756,11 +761,23 @@ void ProcessInstruction() {
     }
     if (opCode_found == FALSE) {
 
-        sprintf(errmsg, "Invalid Opcode %s at line %d position %d", opCode, lineNr, column );
+        snprintf(errmsg, sizeof(errmsg), "Invalid Opcode %s at line %d position %d", opCode, lineNr, column );
         ProcessError(errmsg);
 
         return; 
     }
+
+    ASTinstruction = Create_ASTnode(NODE_INSTRUCTION, "", opCodeTab[i].binInstr);
+    Add_ASTchild(ASTprogram, ASTinstruction);
+
+    if (strcmp(label, "") != 0) {
+        ASTlabel = Create_ASTnode(NODE_LABEL, label, 0);
+        Add_ASTchild(ASTinstruction, ASTlabel);
+        strcpy(label, "");
+    }
+
+    ASToperation = Create_ASTnode(NODE_OPERATION, opCode,0);
+    Add_ASTchild(ASTinstruction, ASToperation);
 
     OpType = opCodeTab[i].instrType;
 
@@ -791,7 +808,7 @@ void ProcessInstruction() {
 //          Parser ProcessDirective
 // --------------------------------------------------------------------------------
 
-void ProcessDirective() {
+void ParseDirective() {
     // printf("DIRECTIVE %s\t", token_old);
     char        dirCode[MAX_WORD_LENGTH];        // Opcode
  
@@ -819,7 +836,7 @@ void ProcessDirective() {
 
 
 
-        sprintf(errmsg, "Invalid directive %s", token);
+        snprintf(errmsg, sizeof(errmsg), "Invalid directive %s", token);
         ProcessError(errmsg);
 
         while (TRUE) {
@@ -833,9 +850,9 @@ void ProcessDirective() {
     }
     if (dirCode_found == TRUE) {
 
-        if (strcmp(dirCode, "ENDMODULE") == NULL ||
-            strcmp(dirCode, "ENDFUNCTION") == NULL ||
-            strcmp(dirCode, "ENDBLOCK") == NULL) {
+        if (strcmp(dirCode, "ENDMODULE") == 0 ||
+            strcmp(dirCode, "ENDFUNCTION") == 0 ||
+            strcmp(dirCode, "ENDBLOCK") == 0) {
             if (currentScopeLevel > 1) {
                 scopeTab[currentScopeLevel--] = NULL;
             }
@@ -849,34 +866,34 @@ void ProcessDirective() {
         else
         {
             symFound = FALSE;
-            searchSymLevel(scopeTab[currentScopeLevel], label, 0);
+            SearchSymLevel(scopeTab[currentScopeLevel], label, 0);
 
             if (symFound == FALSE) {
             //   printf("%s label not found\n", label);
                 strcpy(symValue, "");
 
-                if (strcmp(dirCode, "MODULE") == NULL) {
+                if (strcmp(dirCode, "MODULE") == 0) {
                     currentScopeType = MODULE;
-                    addScope(currentScopeType, label, dirCode, symValue, lineNr);
+                    AddScope(currentScopeType, label, dirCode, symValue, lineNr);
 
                 }
-                else if (strcmp(dirCode, "FUNCTION") == NULL) {
+                else if (strcmp(dirCode, "FUNCTION") == 0) {
                     currentScopeType = FUNCTION;
-                    addScope(currentScopeType, label, dirCode, symValue, lineNr);
+                    AddScope(currentScopeType, label, dirCode, symValue, lineNr);
                 }
-                else if (strcmp(dirCode, "BLOCK") == NULL) {
+                else if (strcmp(dirCode, "BLOCK") == 0) {
                     currentScopeType = BLOCK;
-                    addScope(currentScopeType, label, dirCode, symValue, lineNr);
+                    AddScope(currentScopeType, label, dirCode, symValue, lineNr);
                 }
-                if (strcmp(dirCode, "EQU") == NULL ||
-                    strcmp(dirCode, "REG") == NULL) {
+                if (strcmp(dirCode, "EQU") == 0 ||
+                    strcmp(dirCode, "REG") == 0) {
                     NextToken();
                     if (CheckReservedWord()) {
-                        addDirective(DIRECT, label, dirCode, token, lineNr);
+                        AddDirective(DIRECT, label, dirCode, token, lineNr);
                     }
                     else
                     {
-                        sprintf(errmsg, "Symbol %s is a reserved word", label);
+                        snprintf(errmsg, sizeof(errmsg), "Symbol %s is a reserved word", label);
                         ProcessError(errmsg);
                     }
 
@@ -889,7 +906,7 @@ void ProcessDirective() {
             }
             else {
 
-                sprintf(errmsg, "Symbol %s already defined in this scope", label);
+                snprintf(errmsg, sizeof(errmsg), "Symbol %s already defined in this scope", label);
                 ProcessError(errmsg);
             }
         }
