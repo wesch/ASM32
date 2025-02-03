@@ -6,7 +6,7 @@
 /// \brief this is the lexer building the list of token
 
 // --------------------------------------------------------------------------------
-//      new tokenList entry
+//      new tokenList entry    
 // --------------------------------------------------------------------------------
 
 void NewTokenList() {
