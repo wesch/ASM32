@@ -2,6 +2,9 @@
 #include "constants.hpp"
 #include "ASM32.hpp"
 
+/// @file
+/// \brief this is the lexer building the list of token
+
 // --------------------------------------------------------------------------------
 //      new tokenList entry
 // --------------------------------------------------------------------------------
@@ -13,9 +16,7 @@ void NewTokenList() {
         start_t = (struct tokenList*)malloc(sizeof(struct tokenList));
 
         if (start_t == NULL) {
-
-            printf("Memory allocation failed for Token List\n");
-            return;
+            FatalError("malloc failed");
         }
         start_t->next = NULL;
         ptr_t = start_t;
@@ -46,7 +47,9 @@ void NewTokenList() {
 
 void PrintTokenList() {
 
-    // return;
+    if (DBG_TOKEN == FALSE) {
+        return;
+    }
 
     struct tokenList* ptr_t = start_t;
 
@@ -155,6 +158,44 @@ void GetToken() {
         else if (ch == ')') {
             tokTyp = T_RPAREN;
             strcpy(token, ")");
+            break;
+        }
+        else if (ch == 'L' && sl[ind + 1] == '%') {
+            column = ind;
+            tokTyp = T_NUM;
+            ind = ind + 2;
+            ch = sl[ind];
+            while (isdigit(ch)) {
+
+                token[j] = ch;
+                j++;
+                ind++;
+                ch = sl[ind];
+            }
+            token[j] = '\0';
+            int n = atoi(token);
+            n &= 0xFFFFFC00;
+            snprintf(token, sizeof(token), "%d", n);
+            ind = ind - 1;
+            break;
+        }
+        else if (ch == 'R' && sl[ind + 1] == '%') {
+            column = ind;
+            tokTyp = T_NUM;
+            ind = ind + 2;
+            ch = sl[ind];
+            while (isdigit(ch)) {
+
+                token[j] = ch;
+                j++;
+                ind++;
+                ch = sl[ind];
+            }
+            token[j] = '\0';
+            int n = atoi(token);
+            n &= 0x3FF;
+            snprintf(token, sizeof(token), "%d", n);
+            ind = ind - 1;
             break;
         }
         else if (isalpha(ch)) {                         // alphanumeric 

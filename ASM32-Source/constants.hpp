@@ -1,10 +1,12 @@
 // ****************************************************
-//  Constants for ASM32 Assembler
+//  Konstanten ASM32 Assembler
 // ****************************************************
 
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
+/// @file
+/// \brief enthält die Defines und enums für den Assembler
 
 
 #include <ctype.h>
@@ -18,14 +20,14 @@
 #define FALSE 0
 
 
-#define VERSION "A.00.02.008"
+#define VERSION "A.00.03.21"
 
 
-/* Addresses: */
+/* Adressen */
 #define FIRST_MEMORY_ADDRESS 100
 
-/* Lengths: */
-#define MAX_LINE_LENGTH 80 /* Max line length*/
+/* Längen */
+#define MAX_LINE_LENGTH 255 /* Max line length*/
 #define MAX_FILE_NAME_LENGTH 255 
 #define MAX_WORD_LENGTH 32
 #define MAX_ERROR_LENGTH 255
@@ -57,9 +59,9 @@
 
 
 
-// -------------------------  enum token types  --------------------*
+/// \brief Token Typen
 
-enum {
+typedef enum {
     NONE,
     T_IDENTIFIER,
     T_NUM,
@@ -68,6 +70,8 @@ enum {
     T_DOT,
     T_LPAREN,
     T_RPAREN,
+    T_L22,
+    T_R10,
     T_COMMENT,
     T_DIRECTIVE,
     T_OPCODE,
@@ -82,9 +86,9 @@ enum {
     T_AND,
     T_XOR,
     T_EOL
-};
+} TokenType ;
 
-// -------------------------  enum AST node types  --------------------*
+/// \brief AST node types
 
 typedef enum {
     NODE_PROGRAM,
@@ -98,26 +102,60 @@ typedef enum {
     NODE_EXPRESSION,
     NODE_CONSTANT,
     NODE_LABEL
-} NodeType;
-
-
-
-// -------------------------  enum ScopeType Symboltable --------------------*
+} AST_NodeType;
 
 typedef enum {
-    GLOBAL = 0,     // Globaler Scope
-    PROGRAM = 1,    // Programm- oder Datei-Scope
-    MODULE = 2,     // Modul-Scope
-    FUNCTION = 3,   // Funktions-Scope (lokal)
-    BLOCK = 4,      // Block Scope
-    DIRECT = 5,
-} ScopeType;
+    SRC_GLOBAL,
+    SRC_PROGRAM,
+    SRC_SOURCE,
+    SRC_BIN,
+    SRC_ERROR,
+    SRC_INFO
+} SRC_NodeType;
+
+/// \brief AST operandType 
+typedef enum {  
+    OT_NOTHING,
+    OT_REGISTER,
+    OT_MEMGLOB,
+    OT_MEMLOC,
+    OT_LABEL,
+    OT_VALUE
+} AST_OperandType;
+
+/// \brief ScopeType Symboltable 
+
+typedef enum {
+    SCOPE_GLOBAL = 0,     // Globaler Scope
+    SCOPE_PROGRAM = 1,    // Programm- oder Datei-Scope
+    SCOPE_MODULE = 2,     // Modul-Scope
+    SCOPE_FUNCTION = 3,   // Funktions-Scope (lokal)
+    SCOPE_DIRECT = 4,
+} SYM_ScopeType;
+
+/// \brief Variablen Type für Symboltabelle
+/// </summary>
+
+typedef enum {
+    V_VALUE,
+    V_MEMGLOBAL,
+    V_MEMLOCAL,
+    V_LABEL,
+} SYM_VarType;
+
+/// \brief binsintr in SRCnode
+/// 
+typedef enum {
+    B_NOBIN,
+    B_BIN,
+    B_BINCHILD,
+    
+} ;
 
 
+/// \brief opCodes 
 
-// -------------------------  enum opCodes --------------------*
-
-enum {
+typedef enum {
     ADD,
     ADC,
     ADDIL,
@@ -135,6 +173,7 @@ enum {
     CMR,
     DEP,
     DIAG,
+    DS,
     DSR,
     EXTR,
     GATE,
@@ -160,41 +199,61 @@ enum {
     STC,
     SUB,
     XOR
-};
+} Opcodes;
 
+/// \brief    Directives 
 
-// --------------------------------------------------------------------------------
-// Table of directives
-// --------------------------------------------------------------------------------
+typedef enum {
+    D_ALIGN,
+    D_BEGIN,
+    D_BYTE,
+    D_DATA,
+    D_END,
+    D_EQU,
+    D_HALF,
+    D_REG,
+    D_STRING,
+    D_WORD,
+    D_GLOBAL,
+    D_PROGRAM,
+    D_MODULE,
+    D_ENDMODULE,
+    D_FUNCTION,
+    D_ENDFUNCTION,
+    D_CALL,
+    D_MAIN
 
-const struct directInfo {
+} Directives;
+
+/// \brief Table of directives
+
+const struct directInfo { 
     char directive[12];
+    int  directNum;
 } dirCodeTab[] = {
 
-    { "ALIGN" },
-    { "BYTE" },
-    { "CODE" },
-    { "DATA" },
-    { "END" },
-    { "EQU" },
-    { "HALF" },
-    { "REG" },
-    { "STRING" },
-    { "WORD" },
-    { "GLOBAL" },
-    { "PROGRAM" },
-    { "MODULE" },
-    { "ENDMODULE" },
-    { "FUNCTION" },
-    { "ENDFUNCTION" },
-    { "BLOCK" },
-    { "ENDBLOCK" },
+    { "ALIGN" ,         D_ALIGN },
+    { "BEGIN" ,         D_BEGIN },
+    { "BYTE",           D_BYTE },
+    { "DATA" ,          D_DATA },
+    { "END" ,           D_END },
+    { "EQU" ,           D_EQU },
+    { "HALF" ,          D_HALF },
+    { "REG" ,           D_REG },
+    { "STRING" ,        D_STRING },
+    { "WORD" ,          D_WORD },
+    { "GLOBAL" ,        D_GLOBAL },
+    { "PROGRAM" ,       D_PROGRAM },
+    { "MODULE" ,        D_MODULE },
+    { "ENDMODULE" ,     D_ENDMODULE },
+    { "FUNCTION" ,      D_FUNCTION },
+    { "ENDFUNCTION" ,   D_ENDFUNCTION },
+    { "CALL",           D_CALL },
+    { "MAIN",           D_MAIN }
 
-};
+} ;
 
-// --------------------------------------------------------------------------------
-// Table of other reserved words
-// --------------------------------------------------------------------------------
+/// \brief Table of other reserved words
 
 const struct reservedInfo {
     char resWord[12];
@@ -223,90 +282,114 @@ const struct reservedInfo {
 };
 
 
-// --------------------------------------------------------------------------------
-// Table of OpCode mnemonics
-// 
-// bin_instr: 32 bit instruction which will be filled druing analysis of instruction
-// 
-// instr type; enum opCode to overcome opCode variants with B,H,W
-// 
-// --------------------------------------------------------------------------------
+/// \brief Table of OpCode mnemonics
+/// bin_instr: 32 bit instruction which will be filled druing analysis of instruction
+/// instr type; enum opCode to overcome opCode variants with B,H,W
 
 
 const struct opCodeInfo {
     char        mnemonic[8];
-    uint32_t     binInstr;
+    uint32_t    binInstr;
     int         instrType;
 } opCodeTab[] = {
 
-    { "ADD",     0x40000000 , ADD },
-    { "ADDB",    0x40030000 , ADD },
+    { "ADD",     0x40020000 , ADD },
+    { "ADDB",    0x40000000 , ADD },
     { "ADDH",    0x40010000 , ADD },
-    { "ADDW",    0x40000000 , ADD },
+    { "ADDW",    0x40020000 , ADD },
 
-    { "ADC",     0x44000000 , ADC },
-    { "ADCB",    0x44030000 , ADC },
+    { "ADC",     0x44020000 , ADC },
+    { "ADCB",    0x44000000 , ADC },
     { "ADCH",    0x44010000 , ADC },
-    { "ADCW",    0x44000000 , ADC },
-
-    { "AND",     0x50000000 , AND },
-    { "ANDB",    0x50030000 , AND },
-    { "ANDH",    0x50010000 , AND },
-    { "ANDW",    0x50000000 , AND },
-
-    { "CMP",     0x5C000000 , CMP },
-    { "CMPB",    0x5C030000 , CMP },
-    { "CMPH",    0x5C010000 , CMP },
-    { "CMPW",    0x5C000000 , CMP },
-
-    { "CMPU",    0x60000000 , CMPU },
-    { "CMPUB",   0x60030000 , CMPU },
-    { "CMPUH",   0x60010000 , CMPU },
-    { "CMPUW",   0x60000000 , CMPU },
-
-    { "OR",      0x54000000 , OR },
-    { "ORB",     0x54030000 , OR },
-    { "ORH",     0x54010000 , OR },
-    { "ORW",     0x54000000 , OR },
-
-
-    { "SBC",     0x4C000000 , SBC },
-    { "SBCB",    0x4C030000 , SBC },
-    { "SBCH",    0x4C010000 , SBC },
-    { "SBCW",    0x4C000000 , SBC },
-
-    { "SUB",     0x44000000 , SUB },
-    { "SUBB",    0x44030000 , SUB },
-    { "SUBH",    0x44010000 , SUB },
-    { "SUBW",    0x44000000 , SUB },
-
-    { "XOR",     0x58000000 , XOR },
-    { "XORB",    0x58030000 , XOR },
-    { "XORH",    0x58010000 , XOR },
-    { "XORW",    0x58000000 , XOR },
-
+    { "ADCW",    0x44020000 , ADC },
+        
     { "ADDIL",   0x08000000 , ADDIL },
 
-    { "LDIL",    0x04000000 , LDIL },
+    { "AND",     0x50020000 , AND },
+    { "ANDB",    0x50010000 , AND },
+    { "ANDH",    0x50010000 , AND },
+    { "ANDW",    0x50020000 , AND },
 
-    { "LD",      0xC0000000 , LD },
-    { "LDB",     0xC0030000 , LD },
+    { "B",       0x80000000 , B },
+    { "BE",      0x90000000 , BE },
+    { "BR",      0x88000000 , BR },
+    { "BRK",     0x00000000 , BRK },
+    { "BV",      0x8c000000 , BV },
+    { "BVE",     0x94000000 , BVE },
+
+    { "CBR",      0x98000000 , CBR },
+    { "CBRU",     0x9C000000 , CBRU },
+
+    { "CMP",     0x5C020000 , CMP },
+    { "CMPB",    0x5C000000 , CMP },
+    { "CMPH",    0x5C010000 , CMP },
+    { "CMPW",    0x5C020000 , CMP },
+
+    { "CMPU",    0x60020000 , CMPU },
+    { "CMPUB",   0x60000000 , CMPU },
+    { "CMPUH",   0x60010000 , CMPU },
+    { "CMPUW",   0x60020000 , CMPU },
+
+    { "CMR",      0x24000000 , CMR },
+    { "DEP",      0x18000000 , DEP },
+    { "DIAG",     0xF8000000 , DIAG },
+    { "DS",       0x30000000 , DS },
+
+    { "DSR",      0x1C000000 , DSR },
+    { "EXTR",     0x14000000 , EXTR },
+    { "GATE",     0x84000000 , GATE },
+    { "ITLB",     0xEC000000 , ITLB },
+
+    { "LD",      0xC0020000 , LD },
+    { "LDB",     0xC0000000 , LD },
     { "LDH",     0xC0010000 , LD },
-    { "LDW",     0xC0000000 , LD },
+    { "LDW",     0xC0020000 , LD },
 
-    { "LDR",     0xD0000000 , LDR },
-
-    { "LDA",     0x68000000 , LDA },
-    { "LDAB",    0x68030000 , LDA },
-    { "LDAH",    0x68010000 , LDA },
-    { "LDAW",    0x68000000 , LDA },
-
+    { "LDIL",    0x04000000 , LDIL },
     { "LDO",     0x0C000000 , LDO },
+    { "LDPA",    0xE4000000 , LDPA },
+    { "LDR",     0xD0000000 , LDR },
+    { "LDA",     0x68000000 , LDA },
 
-    { "ST",      0xC4000000 , ST },
-    { "STB",     0xC4030000 , ST },
+    { "LSID",    0x10000000 , LSID },
+    { "MR",      0x28000000 , MR },
+    { "MST",     0x2C000000 , MST },
+
+    { "OR",      0x54000000 , OR },
+    { "ORB",     0x54000000 , OR },
+    { "ORH",     0x54010000 , OR },
+    { "ORW",     0x54020000 , OR },
+
+    { "PCA",     0xF4000000 , PCA },
+    { "PRB",     0xE8000000 , PRB },
+    { "PTLB",    0xF0000000 , PTLB },
+    { "RFI",     0xFC000000 , RFI },
+
+    { "SBC",     0x4C020000 , SBC },
+    { "SBCB",    0x4C000000 , SBC },
+    { "SBCH",    0x4C010000 , SBC },
+    { "SBCW",    0x4C020000 , SBC },
+
+    { "SHLA",    0x20000000 , SHLA },
+
+    { "ST",      0xC4020000 , ST },
+    { "STB",     0xC4000000 , ST },
     { "STH",     0xC4010000 , ST },
-    { "STW",     0xC4000000 , ST },
+    { "STW",     0xC4020000 , ST },
+
+    { "STA",     0xCC000000 , STA },
+    { "STC",     0xD4000000 , STC },
+
+    { "SUB",     0x48020000 , SUB },
+    { "SUBB",    0x48000000 , SUB },
+    { "SUBH",    0x48010000 , SUB },
+    { "SUBW",    0x48020000 , SUB },
+
+    { "XOR",     0x58020000 , XOR },
+    { "XORB",    0x58000000 , XOR },
+    { "XORH",    0x58010000 , XOR },
+    { "XORW",    0x58020000 , XOR },
+
 };
 
 

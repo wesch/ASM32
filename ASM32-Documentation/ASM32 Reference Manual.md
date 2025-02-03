@@ -4,30 +4,48 @@
 
 Wolfgang Eschenfelder
 
-Version A.00.01   April 2024
+Version A.00.03.20  February 2025
 
+
+- [ASM32 Assembler Reference Manual](#asm32-assembler-reference-manual)
+  - [Introduction](#introduction)
+  - [Assembler Features](#assembler-features)
+  - [Program Structure](#program-structure)
+  - [Symbols and Constants](#symbols-and-constants)
+  - [Register and Register Mnemonics](#register-and-register-mnemonics)
+    - [General Register Mnemonics](#general-register-mnemonics)
+    - [Segment Register Mnemonics](#segment-register-mnemonics)
+  - [Expressions](#expressions)
+  - [Parenthesized Subexpressions](#parenthesized-subexpressions)
+- [Scope](#scope)
+- [Assembler Directives](#assembler-directives)
+  - [.BYTE Directive](#byte-directive)
+  - [.END Directive](#end-directive)
+  - [.EQU Directive](#equ-directive)
+  - [.HALF Directive](#half-directive)
+  - [.REG Directive](#reg-directive)
+  - [.WORD Directive](#word-directive)
+- [Assembler Processing](#assembler-processing)
+  - [Main Program](#main-program)
+  - [Lexer](#lexer)
+  - [Parser](#parser)
+    - [ParseLabel](#parselabel)
+    - [ParseDirective](#parsedirective)
+    - [ParseInstruction](#parseinstruction)
+      - [ParseExpression](#parseexpression)
+    - [Codegen](#codegen)
 
 
 ## Introduction 
 
 This document describes the use of the ASM32 Assembler for the VCPU-32. The ASM32 Assembly Language represents machine language instructions symbolically, and permits declaration of addresses symbolically as well. The Assembler's function is to translate an assembly language program, stored in a source file, into machine language.
 
-As the concept for the VCPU-32 is heavily influenced by Hewlett Packards PA_RISC architecture, the following reference manual follows the structure of the PA RISC Assembler manual.
+As the concept for the VCPU-32 is heavily influenced by Hewlett Packards PA_RISC architecture, the following reference manual follows the structure of the PA RISC Assmebler manual.
 
 For details about the VCPU-32 architecture please refer to 
 
 _VCPU-32 System Architecture and instructions Set Reference_
 
-
-## Typogaphical Conventions
-
-This document uses the following symbolic conventions.
-
-[ ] In syntax formats, square brackets enclose optional
-items.
-
-{ } In syntax formats, braces enclose a list from which you
-must choose an item.
 
 ## Assembler Features
 
@@ -43,7 +61,8 @@ You can select a symbol to refer to the address of a location in virtual memory.
 A symbol can also be selected to stand for an integer constant.
 
 - **Expressions:**  
-Arithmetic expressions can be formed from symbolic addresses and constants, integer constants, and arithmetic operators. Expressions involving only symbolic and integer constants, or the difference between two symbolic adresses, defined in the current module, are called Symbolic Constants. They can be used wherever an integer constant can be used. Expressions involving the sum or difference of a symbolic address and an absolute expression are called address expressions. The constant part of an expression, the part that does not refer to symbolic adresses, can use parenthesized subexpressions to alter operator precedence.
+Arithmetic expressions can be formed from symbolic constants, integer constants, and arithmetic operators. Expressions involving only symbolic and integer constants, defined in the current module, are called Symbolic Constants. They can be used wherever an integer constant can be used. 
+
 
 - **Storage Allocation:**  
 In addition to encoding machine language instructions symbolically, storage may be initialized to constant values or simply reserved. Symbolic addresses and labels can be associated with these memory locations.
@@ -51,31 +70,23 @@ In addition to encoding machine language instructions symbolically, storage may 
 
 ## Program Structure
 
-An assembly language program is a sequence of statements. There are three classes of statements:
+An assembly language program is a sequence of statements. 
+
+Each statement contains up to four fields:
+- Label
+- Opcode or directive
+- Operands
+- Comments
+
+The operands field cannot appear without an opcode field. 
+
+There are three classes of statements:
 
 **Instructions**  
 represent a single machine instruction in symbolic form. 
 
-
 **Directives**   
 communicate information about the program to the Assembler or cause the Assembler to initialize or reserve one or more words of storage for data
-
-
-An assembly statement contains four fields:
-
-- Label
-
-- Opcode
-
-- Operands
-
-- Comments
-
-
-
-Each of these fields is optional. However the operands field cannot appear without an opcode field. 
-
-
 
 The **label** field is used to associate a symbolic address with an instruction or data location, or to define a symbolic constant using the .EQU, or .REG directives. This field is optional for all but a few statement types. If a label appears on a line by itself, or with a comment only, the label is associated with the next address within the same subspace and location counter.
 
@@ -83,7 +94,7 @@ A **comment** is starting with a **;**. All text after the comment until end of 
 
 ## Symbols and Constants
 
-Both addresses and constants can be represented symbolically. Labels represent a symbolic address except when the label is on an .EQU or .REG  directive. If the label is on an .EQU or .REG directive, the label represents a symbolic constant. 
+Both addresses and constants can be represented symbolically. Labels represent a symbolic address except when the label is on an .EQU or .REG  directive. If the label is on an .EQU or .REG directive, the label represents a symbolic constant. The Label needs to end with a ":".
 
 Symbols are composed of 
 
@@ -91,13 +102,10 @@ Symbols are composed of
 
 - decimal digits (0-9)
 
-- dollar signs ($)
-
-- underscores (_). 
 
 A symbol needs to begin with a letter.
 
-The Assembler considers uppercase and lowercase letters in symbols _distinct_. The mnemonics for operation codes, directives, and pseudo-operations can be written in either case. 
+The Assembler considers uppercase and lowercase letters in symbols _not distinct_. The mnemonics for operation codes, directives, and pseudo-operations can be written in either case. 
 
 The length of a symbol name is restricted to 32. The name of a symbol needs to be unique within a scope, This means it can not occur twice or more within an adressable range. 
 
@@ -133,28 +141,25 @@ Some additional predefined register mnemonics are provided based on the standard
 
 | Register | Mnemonic | Description |
 | -------- | ----------------- | ----------- |
-| S5 | TS | Taks Segment |
+| S5 | TS | Task Segment |
 | S6 | JS | Job Segment |
 | S7 | SS | System Segment |
 
 ## Expressions
 
-Arithmetic expressions are often valuable in writing assembly code. The Assembler allows expressions involving integer constants, symbolic constants, and symbolic addresses. These terms can be combined with the standard arithmetic operators. The tabke below shows all valid operators and their priority
+Arithmetic expressions are often valuable in writing assembly code. The Assembler allows expressions involving integer constants and symbolic constants. These terms can be combined with the standard arithmetic operators. 
 
 
-| Operator | Operation | Prio |
-| - | - | - |
-| ! | logical not | 9 |
-| * | Integer multiplication | 8 |
-| / | Integer division (result is truncated) | 8 |
-| + | Integer addition | 7 |
-| - | Integer subtraction | 7 |
-| << | left shift | 6 |
-| >> | right shift | 6 |
-| && | logical and | 5 |
-| \|\| | logical or | 5 |
+| Operator | Operation |
+| - | - |
+| + | Integer addition |
+| - | Integer subtraction |
+| * | Integer multiplication |
+| / | Integer division (result is truncated) |
+| L% | Left 22bit |
+| R% | Right 10 bit |
 
-### Parenthesized Subexpressions
+## Parenthesized Subexpressions
 
 The constant term of an expression may contain parenthesized subexpressions that alter the order of evaluation from the precedence normally associated with arithmetic operators.
 
@@ -162,84 +167,47 @@ For example
 
     LDI R5, data5 + ( data7 - 4 ) * data0
 
-### Expressions for symbolic constants
+# Scope
 
-Expression for symbolic constants provide finaly a numeric value which will be part of the instruction. Therefore also the difference of two symbolic adresses can be provided (e.g. to calculate a length of a set of fields).
+An assembler program has 4 Scope levels:
 
-**Example**
+- Global Scope is the root of all scopes. 
+- Program Scope contains all information of a single source code file.
+- Module Scope is the next level unit within a source file (Program Scope).
+- Function Scope is the next level beyond the Module Scope.
 
-    Field1  .word
-    Field2  .word
-    Field3  .word
-
-    DISTANCE    .EQU    Field3 - Field1 ; equals 8 (bytes)
-
-### Expressions for symbolic adresses
-
-Expression for symbolic adress provide an adress of an object. Therefore a symbolic adress can be part of an expression. 
-
-> [!NOTE]  
-> **Please ensure that the result of the expression is a valid adress.**
+![b9b07d9cb0ef713995c30eb8cb4f8d4d.png](./b9b07d9cb0ef713995c30eb8cb4f8d4d.png)
 
 
+Every source file passed to the assembler defines a program scope.
 
-**Example**
+The directives .MODULE and .FUNCTION determine the scope level with a program.
 
-    Field1  .word
-    Field2  .word
+The symbol table is organized according to the scope level. If a new symbol is defined it must be unique within the current scope. Reference to the symbol walks along the scope tree upwards. E.g. is a symbol is referenced on function scope, it is searched on function scope level. If it is not found it is searched on module scope level. If it is not found on module level, it is searched on program scope level. 
 
-    offset  .EQU    4
+Currently no symbols on global level are supported. 
 
-    ADDW    R3,Field1+offset   ; will add Field2
 
 # Assembler Directives
 
-Assembler directives allow you to take special programming actions during the assembly process. The directive names begin with a period (.) to distinguish them from machine instruction opcodes.
+Assembler directives allow to take special programming actions during the assembly process. The directive names begin with a period (.) to distinguish them from machine instruction opcodes.
+
 
 
 | Directive | Function |
 | - | - |
-| .ALIGN | Forces location counter to the next largest multiple of the supplied alignment value. |
-| .BLOCK | Reserves a block of data storage |
 | .BYTE | Reserves 8 bits (a byte) of storage and initializes it to the given value. |
 | .END | Terminates an assembly language program. |
 | .EQU | Assigns an expression to an identifier. |
 | .HALF | Reserves 16 bits (a half word) of storage and initializes it to the given value. |
 | .REG | Attaches a type and number to a user-defined register name.|
-| .SECTION | Defines the begin of a new section |
-| .SEGMENT | Defines the begin of a new segment |
-| .STRING | Reserves the appropriate amount of storage and initializes it to the given string.|
-| .VERSION | TInserts the specified string into the current object module as a user-defined version identification string. |
 | .WORD | Reserves 32 bits (a word) of storage and initializes it to the given value. |
+| .PROGRAM .ENDPROGRAM | Start and end of a Source Program scope |
+| .MODULE .ENDMODULE | Start and end of Module scope |
+| .FUNCTION .ENDFUNCTION | Start and end of Function scope |
 
 
-## .ALIGN Directive
-
-Forces location counter to the next largest multiple of the supplied alignment value.
-
-**Syntax**
-
-    .ALIGN [boundary]
-
-__boundary__  
-An integer value for the byte boundary to which you want to advance the location counter. The Assembler advances the location counter to that boundary. Permissible values must be a power of 2 and can range from one to 4096. The default value is 4.
-
-## .BLOCK Directive
-
-Reserves a block of data storage
-
-**Syntax**
-
-    [symbolic_name]  .BLOCK [num_bytes]
-
-__symbolic_name__  
-The name of the identifier to which the Assembler assigns to the block.
-
-
-__num_bytes__  
-An integer value for the number of bytes you want to reserve. Permissible values range from zero to 0x3FFFFFFF. The default value is zero.
-
-<### to be clarified>
+Symbolic names must not be equal to a reserved word. 
 
 
 ## .BYTE Directive
@@ -248,13 +216,17 @@ Reserves 8 bits (a byte) of storage and initializes it to the given value.
 
 **Syntax**
 
-    [symbolic_name]  .BYTE [init_value]
+    symbolic_name  .BYTE [init_value]
 
-__symbolic_name__  
+**Parameter**   symbolic_name
+
 The name of the identifier to which the Assembler assigns to the byte.
 
-__init_value__  
-Either a decimal, octal, or hexadecimal number or a sequence of ASCII characters, surrounded by quotation marks. If you omit the initializing value, the Assembler initializes the area to zero.
+**Parameter**   init_value
+
+Either a decimal or hexadecimal number. If you omit the initializing value, the Assembler initializes the area to zero.
+
+
 
 ## .END Directive
 
@@ -264,24 +236,31 @@ Terminates an assembly language program.
 
     .END 
 
+
 This directive is the last statement in an assembly language program. If a source file lacks an .END directive, the Assembler terminates the program when it encounters the end of the file.
 
 ## .EQU Directive
 
-Assigns an expression to an identifier.
+Assigns an expression to an identifier. It must be defined before it is referenced.
 
 **Syntax**
 
     symbolic_name    .EQU    value
 
-__symbolic_name__  
+
+**Parameter**   symbolic_name
+
 The name of the identifier to which the Assembler assigns the expression.
 
-__value__  
-An integer expression. The Assembler evaluates the expression, which must be a symbolic constant and assigns this value to symbolic_name.
+**Parameter**  value
 
-**NOTE**  
-The Assembler prohibits the use of symbolic adresses and imported symbols as components of an .EQU expression.
+An integer expression. The Assembler evaluates the expression, which must be absolute, and assigns this value to symbolic_name.
+
+**NOTE**
+
+The Assembler prohibits the use of relocatable symbols (instruction labels) and imported symbols as components of an .EQU expression. 
+
+Nested EQU are not allowed. E.g.  V1  .EQU 5, V2 .EQU V1.
 
 ## .HALF Directive
 
@@ -289,127 +268,33 @@ Reserves 16 bits (a half word) of storage and initializes it to the given value.
 
 **Syntax**
 
-    [symbolic_name]   .HALF [init_value]
+    symbolic_name  .HALF [init_value]
 
-__symbolic_name__  
+**Parameter**   symbolic_name
+
 The name of the identifier to which the Assembler assigns to the half-byte.
 
-__init_value__  
-Either a decimal, octal, or hexadecimal number or a sequence of ASCII characters, surrounded by quotation marks. If you omit the initializing value, the Assembler initializes the area to zero.
+**Parameter**   init_value
 
-## .RECORD Directive
-
-Defines a structure name where fields are part of the structure. Elements of the structure can be used as symbolic adresses by 
-
-    name_of_record.field_name
-
-**Syntax**
-
-      symbolic_name     .RECORD 
-
-__symbolic_name__  
-A user-defined name of the structure. The structure is closed by  **.ENDRECORD**.
-
-**Example**
-    
-    ; Define a structure with 3 fields in total 12 bytes
-
-	leaf        .RECORD 
-	    back    .WORD   
-		forw    .WORD   
-	    pointer .WORD   
-    	        .ENDRECORD   
-
-    ; use element of the structure in an instruction
-
-        ADDW R3,leaf.forw
-    
+Either a decimal or hexadecimal number. If you omit the initializing value, the Assembler initializes the area to zero.
 
 ## .REG Directive
 
-Attaches a type and number to a user-defined register name.
+Attaches a type and number to a user-defined register name. It must be defined before it is referenced.
 
 **Syntax**
 
-    symbolic_name    .REG register
+    symbolic_name    .REG [register]
 
-__symbolic_name__  
+**Parameter**   symbolic_name 
+
 A user-defined register name.
 
-__register__  
-Must be one of the predefined Assembler registers or a previously defined user-defined register name.
+**Parameter**   register
 
-## .SECTION Directive
+Must be one of the predefined Assembler registers (R0-R15,S0-S7,....)
 
-Defines the begin of  section.
-
-**Syntax**
-
-    [symbolic_name]    .SECTION type [,BASE=register])  
-
-__symbolic_name__  
-A user-defined name of the section. The section is closed by  **.ENDSECTION**.
-
-__type__  
-defines the type of the section. Valid values are 
- - GLOBAL       contains global variables
- - CODE         contains instructions
- - CONST        contains constatnts/literals which can't be changed
-
-__BASE__  
-Defines the base register to build the adress of elemnts within this section. 
-
-** Example**
-
-    ; Define a section for global variables using DP as base register
-    
-    MY_GLOBAL   .SECTION GLOBAL,BASE=DP   
-    F_1         .WORD
-    F_2         .WORD
-    F_3         .BYTE
-                .ENDSECTION
-
-## .SEGMENT Directive
-
-Defines teh begin of a segment.
-
-**Syntax**
-
-    [symbolic_name]    .SEGMENT type
-
-__symbolic_name__  
-A user-defined name of the segemnt. The section is closed by  **.ENDSEGMENT**.
-
-__type__  
-defines the type of the section. Valid values are 
- - PRIVATE       contains  variables
- - TEXT          contains instructions and constants/literals
-
-## .STRING Directive
-
-Reserves the appropriate amount of storage and initializes it to the given string. It appends a zero byte to the data. (C-Language-Style String)
-
-**Syntax**
-
-    [symbolic_name]  .STRING "init_value"
-
-__symbolic_name__  
-The name of the identifier to which the Assembler assigns to the string.
-
-__init_value__  
-A sequence of ASCII characters, surrounded by quotation marks. A string can contain up to 256 characters. The enclosing quotation marks are not stored.
-
-## .VERSION Directive
-
-The .VERSION directive places the designated string in the current
-object module for version identification.
-
-**Syntax**
-
-         .VERSION "info_string"
-
-__info_string__  
-A sequence of ASCII characters, surrounded by quotation marks. A string can contain up to 256 characters. The enclosing quotation marks are not stored.
+Nested REG are not allowed. E.g.  SP1 .REG R5, SP2  .REG SP1.
 
 ## .WORD Directive
 
@@ -417,10 +302,134 @@ Reserves 32 bits (a  word) of storage and initializes it to the given value.
 
 **Syntax**
 
-    [symbolic_name]  .WORD [init_value]
+    symbolic_name  .WORD [init_value]
 
-__symbolic_name__  
-The name of the identifier to which the Assembler assigns to the word.
+**Parameter**   symbolic_name
 
-__init_value__  
-Either a decimal, octal, or hexadecimal number or a sequence of ASCII characters, surrounded by quotation marks. If you omit the initializing value, the Assembler initializes the area to zero.
+The name of the identifier to which the Assembler assigns to the word.3
+
+**Parameter**   init_value
+
+Either a decimal or hexadecimal number. If you omit the initializing value, the Assembler initializes the area to zero.
+
+# Assembler Processing
+
+The assembler processes the sourcecode within the following steps:
+
+- Main program
+- Lexer
+- Parser
+- Codegen
+
+## Main Program
+
+The main program establishes the overall environment, opens the source file, reads the sourcline and passes into the lexer.
+
+In parallel it builds a tree structure (SRCNode) global->program->sourceline as a base for printing sourclines, binary instructions and errormessages
+
+## Lexer
+
+The Lexer reads the source line and extracts the tokens and provides the tokenList. This is a linked list with all tokens, sourcline number and column.
+During processing the lexer converts **hexadecimal values to decimal** values and masks L% and R% values accordingly.
+
+## Parser
+
+The Parser reads the tokenList and generates the symbol table (SymNode) and the abstract syntax tree (ASTNode). The parser consists of mutliple subprocessing routines
+
+for label (ParseLabel), directives (ParseDirectives) and instructions (Parseinstruction).
+
+All tokens are translated to uppercase to ensure a commen naming inised symboltable etc.
+
+### ParseLabel
+
+This is the most simple routing which just moves a valid label token into a field named label. It will be processes with the ParseInstruction  or ParseDirective routine.
+
+### ParseDirective
+
+The tokens identified as directives (starting with a .) are checked against a table dirCodeTab. If the directive is valid the appropriate processing takes place.
+
+For each directive an entry in the symbol table is created. **MODULE** adn **FUNCTON** directives and their corresponding end functions (ENDFUNCTION) build scope levels withinn the symbol table tree.
+
+**SymbolTable**
+- scope type
+- scope level   -> global=0, program=1, module=2, function=3
+- scope name    
+- label         
+- function      -> directive (without .)    
+- value          
+- variable type 
+- linenr
+- code address
+- data address
+- pointer to children nodes
+- number of children nodes
+
+**Scope types:**
+- SCOPE_GLOBAL
+- SCOPE_PROGRAM
+- SCOPE_MODULE
+- SCOPE_FUNCTION
+- SCOPE_DIRECT
+
+**Variable Type**
+- Value
+- Memory global
+- Memory local
+- Label
+
+**.MODULE and .FUNCTION processing**
+
+If a .MODULE directive is detected, scopetype is set to SCOPE_MODULE, dataAdr is set to zero. If .ENDMODULE is detected, scope level is set back to SCOPE_PROGRAM. 
+Analog for .FUNCTION.
+
+**.EQU and .REG processing**
+For both directives it is checked if a directive with the same name (label) is already existing on the same scope level. If not, then the Symbol is inserted in the symboltable.
+
+**.BYTE, .HALF and .WORD processing**
+
+Depending of the scope level (module or function) the variable type is set to Memory global or Memory local. 
+It is checked if a directive with the same name (label) is already existing on the same scope level. If not, then the Symbol is inserted in the symboltable.
+Furthermore .WORD is aligend to word address, .HALF is aligned to halfword address.
+
+### ParseInstruction
+
+The tokens identified as instructions are checked against a table opCodeTab. If the opcoode is valid the further processing takes place in base of the type of the opcode. An entry in the opCodeTab assigns every opcode to an OpType. This Optype determines smae parsing procedure for a goup of opcodes which have the same mnemonic structure.
+
+For every group a dedicated parsing routine is in place. In these routines every token is analyzed. if the token is an expected token an entry into the abstract systax tree (AST) is created.
+
+**AST** 
+- node type
+- value in character of the entry
+- numeric value of the entry if available
+- linenr of the source line
+- column number of the token
+- scopelevel (program, module, function)
+- name of the scope
+- adress of the corresponging node of the symbol table for easier search function in the symbol table.
+- operand type to define the type of the value (register, memorylocation, label, value)
+- address of code 
+- binary word of the instruction derived from opCodeTab.
+- pointer to children nodes
+- number of children nodes
+
+#### ParseExpression
+
+Expressions are recursively parsed. ParseExpression calls **ParseTerm** and calculates plus, minus, or, xor operations.
+
+**ParseTerm** calls **ParseFactor** and calculates multiply, division, modulo, and operations.
+
+**ParseFactor** processes the numbers, substitutes the EQU or global/local offsets. 
+
+
+### Codegen
+
+The codegen routine reads the **AST** sequentially, calculates code address and populates the binary word of the instruction.
+
+The procedure GenBinOption checks the options by groups of instructions with the same options.
+
+For instructions using a memory location the memory type can be:
+
+- Memory global (in module)
+    offset is calculated as the data offset within the module and register R13. 
+- Memory local (in function)
+    tbd

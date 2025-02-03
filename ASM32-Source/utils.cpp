@@ -2,6 +2,9 @@
 #include "constants.hpp"
 #include "ASM32.hpp"
 
+/// @file
+/// \brief contains various helper functions
+
 
 // --------------------------------------------------------------------------------
 //      Sub Routines  
@@ -29,8 +32,9 @@ void CloseSourceFile() {
 
 void FatalError(const char* msg) {
 
-    fprintf(stderr, "\n----- ASM32 Assembler Error: %s -----\n\n", msg);
-    exit(0);
+    printf("Fatal Error> %s\n", msg);
+    printf("\n---- - ASM32 Assembler terminated---- - \n");
+    exit(255);
 }
 
 
@@ -50,9 +54,33 @@ void StrToUpper(char* _str) {
 }
 
 
+// --------------------------------------------------------------------------------
+// StrToNum (string)
+//  This function converts all letters in a string to a number
+// --------------------------------------------------------------------------------
+
+int StrToNum(char* _str) {
+    int i = 0;
+    sscanf(_str, "%d", &i);
+    return i;
+}
+
+
 void ProcessError(const char* msg) {
-    printf("Err> %s\n", msg);
-    SkipToEOL();
+
+    // printf("E: %s\n", msg);
+
+    lineERR = TRUE;
+    
+    strcpy(buffer, msg);
+    strcat(buffer, "\n");
+
+    Search_SRC(GlobalSRC, 0);
+
+    bin_status = B_NOBIN;
+    SRCerror = Create_SRCnode(SRC_ERROR, buffer, lineNr);
+
+    Add_SRCchild(SRCcurrent, SRCerror);
 }
 
 void PrintDebug(const char* msg) {
