@@ -20,7 +20,7 @@
 #define FALSE 0
 
 
-#define VERSION "A.00.03.21"
+#define VERSION "A.00.03.22"
 
 
 /* Adressen */

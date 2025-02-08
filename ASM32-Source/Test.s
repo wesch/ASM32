@@ -8,7 +8,28 @@ HELLO:	.REG	R1
 V1:		.WORD
 V2:		.HALF
 
-		PRB		R1,(R2)
+		MST		R3, R5
+		MST.S	R4,6
+		MST.C	R4,6
+		MST.C	R3, R4
+
+
+		MR	R1,S1
+		MR	S6,R1
+		MR	R2,C1
+		MR	C4,R2
+
+
+
+
+		PCA    R17(R2)
+		PCA    R2(S1,R3)
+		PCA.T  R3(R4)
+		PCA.M  R3(r4)
+		PCA.F	R4(R5)
+		PCA.MTF R4(R5) 
+
+		PRB     R1,(R2)
 		PRB.WI	R2,(S1,R3)
 		PRB.WI	R2,(S1,R3),R4
 
@@ -17,7 +38,7 @@ V2:		.HALF
 		ITLB	R4,(R5,R6)
 		ITLB.T	R7,(R8,R9)
 
-		DIAG	R2,R3,R4,23
+		DIAG	R2,R3,R4,12
 
 		RFI
 
@@ -28,13 +49,13 @@ V2:		.HALF
 		SHLA.LO	R2,R3,R4,3
 
 
-		STC		R3, 31(R5)
-		STC		R4, 31(s2,R7)
-		STC		R6,V2
+		STC     R3, 31(R5)
+		STC     R4, 31(s2,R7)
+		STC     R6,V2
 
-		LDR		R1, 25(R2)
-		LDR		R2, 25(S3,R3)
-		LDR		R3,V1
+		LDR     R1, 25(R2)
+		LDR     R2, 25(S3,R3)
+		LDR     R3,V1
 
 		LDO		R2,25(R5)
 		LDO		R3,V1

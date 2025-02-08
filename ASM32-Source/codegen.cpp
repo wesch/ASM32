@@ -109,6 +109,43 @@ void SetGenRegister(int reg, char* regname) {
 
 }
 
+/// @par sets register nummer for MR instruction
+///     - regname -> Name das Register e.g. S1 or C12
+/// 
+void SetMRRegister(char* regname) {
+
+    int x = strlen(regname);
+    char t[2];
+    if (x == 2) {
+
+        t[0] = regname[1];
+        value = t[0] - 48;
+    }
+    else {
+
+        t[0] = regname[1];
+        t[1] = regname[2];
+        value = 10 * (t[0] - 48) + (t[1] - 48);
+    }
+    if (regname[0] == 'S') {
+        if (value < 1 || value > 7) {
+
+            snprintf(errmsg, sizeof(errmsg), "Segment register # %d out of range", value);
+            ProcessError(errmsg);
+            return;
+        }
+    }
+    else if (regname[0] == 'C') {
+        if (value < 1 || value > 31) {
+
+            snprintf(errmsg, sizeof(errmsg), "Control register # %d out of range", value);
+            ProcessError(errmsg);
+            return;
+        }
+    }
+    SetBit(31, value, 4);
+}
+
 /// @par provides segment register number
 ///     - regname -> Name das Register e.g. S1
 
@@ -455,6 +492,10 @@ void GenBinOption() {
     case MST:
 
         switch (option[0][0]) {
+
+        case ' ':
+
+            break;
 
         case 'S':
             SetBit(11, 1, 1);
@@ -929,8 +970,32 @@ void GenBinInstruction() {
 
     case PCA:
     case PTLB:
+        
+        SetGenRegister('R', opchar[0]);
+        if (opchar[1][0] == 'S') {
+            value = GetSegRegister(opchar[2]);
+            if (value > 0 && value < 4) {
+                SetBit(13, value, 2);
+            }
+            else {
+                snprintf(errmsg, sizeof(errmsg), "Segmentregister S%d not allowed\n", value);
+                ProcessError(errmsg);
+                break;
+            }
+            SetGenRegister('B', opchar[2]);
+            if (strcmp(opchar[3], "") != 0) {
 
-        printf("regA,regB\n");
+                SetGenRegister('A', opchar[3]);
+            }
+        }
+        else {
+            SetGenRegister('B', opchar[1]);
+            if (strcmp(opchar[2], "") != 0) {
+
+                SetGenRegister('A', opchar[2]);
+            }
+        }
+
         break;
 
     case CMR:
@@ -1041,16 +1106,36 @@ void GenBinInstruction() {
 
     case MR:
 
-        printf("regR,regS or regR,regC or vice versa\n");
+        if (opchar[0][0] == 'R') {
+            SetGenRegister('R', opchar[0]);
+        }
+        else {
+            SetMRRegister(opchar[0]);
+
+        }
+        if (opchar[1][0] == 'R') {
+            SetGenRegister('R', opchar[1]);
+        }
+        else {
+            SetMRRegister(opchar[1]);
+        }
         break;
 
     case MST:
 
-        printf("val|regB\n");
+        SetGenRegister('R', opchar[0]);
+        if (operandTyp[1] == OT_REGISTER) {
+
+            SetGenRegister('B', opchar[1]);
+        }
+        else {
+            SetBit(31, opnum[1], 4);
+        }
         break;
 
     case RFI:
 
+        // nothing to do
         break;
 
     case LD:

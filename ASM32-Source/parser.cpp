@@ -19,12 +19,12 @@ ASTNode* Create_ASTnode(AST_NodeType type, const char* value, int valnum) {
     }
     strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
     node->type = type;
-    node->value = _strdup(value);
+    node->value = strdup(value);
     node->valnum = valnum;
     node->linenr = lineNr;
     node->column = column;
     node->scopeLevel = currentScopeLevel;
-    node->scopeName = _strdup(currentScopeName);
+    node->scopeName = strdup(currentScopeName);
     node->symNodeAdr = scopeTab[currentScopeLevel];
     node->children = NULL;
     node->codeAdr = codeAdr;    
@@ -422,6 +422,76 @@ bool CheckSegReg() {
     }
 }
 
+// --------------------------------------------------------------------------------
+// Check Control Register
+//  checks if global token contains a valid Control register
+// --------------------------------------------------------------------------------
+
+bool CheckCtrlReg() {
+
+    int reg = 0;                            // register number from checkreg = 0;
+
+    StrToUpper(token);
+
+    if (token[0] == 'C') {
+
+        if (strlen(token) == 3) {
+
+            if (isdigit(token[1]) && isdigit(token[2])) {
+
+                reg = ((token[1] - 48) * 10 + token[2] - 48);
+                return TRUE;
+            }
+            else {
+                return  FALSE;
+            }
+        }
+        else if (strlen(token) == 2) {
+
+            if (isdigit(token[1])) {
+
+                reg = token[1] - 48;
+                return TRUE;
+            }
+            else {
+                return  FALSE;
+            }
+        }
+        else {
+
+            return FALSE;
+        }
+    }
+    else {
+        searchScopeLevel = currentScopeLevel;
+
+        if (SearchSymbol(scopeTab[searchScopeLevel], token)) {
+            if (strcmp(symFunc, "REG") == 0) {
+
+                strcpy(token, symValue);
+
+                if (CheckGenReg()) {
+                    return TRUE;
+                }
+                else
+                {
+                    return FALSE;
+                }
+            }
+            else
+            {
+                strcpy(currentScopeName, scopeNameTab[searchScopeLevel]);
+                return FALSE;
+            }
+        }
+        else
+        {
+            return FALSE;
+        }
+    }
+}
+
+
 
 
 int ParseFactor() {
@@ -446,7 +516,7 @@ int ParseFactor() {
         
         if (tokTyp == T_NUM) {
 
-            int result = sscanf_s(token, "%i", &n);
+            int result = sscanf(token, "%i", &n);
 
         }
         else if (tokTyp == T_IDENTIFIER) {
@@ -587,8 +657,6 @@ int ParseExpression() {
     }
 }
 
-
-
 /// @par Hole nächstes Token aus der Liste
 /// 
 void GetNextToken() {
@@ -633,8 +701,6 @@ void PrintAST(ASTNode* node, int depth) {
         PrintAST(node->children[i], depth + 1);
     }
 }
-
-
 
 // --------------------------------------------------------------------------------
 //      PrintTokenCode (code) --> string
@@ -1223,6 +1289,299 @@ void ParseBE() {
 
 }
 
+
+/// @par Parse PCA, PTLB
+///     - PCA[.<TM>] regA([regS,]regB)
+///     - PTLB[.<TM>] regA([regS,]regB)
+
+void ParsePCA_PTLB() {
+
+    // Check Option
+
+    if (tokTyp == T_DOT) {
+
+        GetNextToken();
+        if (tokTyp == T_IDENTIFIER) {
+
+            if (DBG_PARSER) {
+                printf("OPT1 %s ", token);
+            }
+            operandType = OT_NOTHING;
+            ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
+            Add_ASTchild(ASTinstruction, ASTopt1);
+        }
+        GetNextToken();
+    }
+
+    // Here should be regA
+
+    if (CheckGenReg() == TRUE) {
+        if (DBG_PARSER) {
+            printf("regB %s ", token);
+        }
+        operandType = OT_REGISTER;
+        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
+        Add_ASTchild(ASTinstruction, ASTop1);
+        GetNextToken();
+    }
+
+    if (tokTyp != T_LPAREN) {
+        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+        ProcessError(errmsg);
+        return;
+    }
+    GetNextToken();
+
+    // Here should be regB or regS 1-3
+
+    if (CheckGenReg() == TRUE) {
+        if (DBG_PARSER) {
+            printf("regB %s ", token);
+        }
+        operandType = OT_REGISTER;
+        ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
+        Add_ASTchild(ASTinstruction, ASTop2);
+    }
+    else if (CheckSegReg() == TRUE) {
+        if (DBG_PARSER) {
+            printf("regB %s ", token);
+        }
+        operandType = OT_REGISTER;
+        ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
+        Add_ASTchild(ASTinstruction, ASTop2);
+        // Here should be a comma
+
+        GetNextToken();
+        if (tokTyp != T_COMMA) {
+            snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+            ProcessError(errmsg);
+            return;
+        }
+        GetNextToken();
+        if (CheckGenReg() == TRUE) {
+            if (DBG_PARSER) {
+                printf("regB %s ", token);
+            }
+            operandType = OT_REGISTER;
+            ASTop4 = Create_ASTnode(NODE_OPERAND, token, 0);
+            Add_ASTchild(ASTinstruction, ASTop4);
+        }
+        else {
+            snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
+            ProcessError(errmsg);
+            return;
+        }
+    }
+    else {
+        snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
+        ProcessError(errmsg);
+        return;
+    }
+    // Here should be a RPAREN
+    GetNextToken();
+    if (tokTyp != T_RPAREN) {
+        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+        ProcessError(errmsg);
+        return;
+    }
+}
+
+/// @par Parse MR
+///     - MR regR,<regS|regC>
+///     - MR <regS|regC>,regR
+
+
+void ParseMR() {
+
+    // check if general register
+
+    if (CheckGenReg() == TRUE) {
+
+        mode = 0;
+    }
+    else if (CheckSegReg() == TRUE) {
+        mode = 1;
+    }
+    else if (CheckCtrlReg() == TRUE) {
+        mode = 2;
+    } 
+    else
+    {
+        snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
+        ProcessError(errmsg);
+        return;
+    }
+    operandType = OT_REGISTER;
+    ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
+    Add_ASTchild(ASTinstruction, ASTop1);
+
+
+
+    // Here should be a comma
+
+    GetNextToken();
+    if (tokTyp != T_COMMA) {
+        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+        ProcessError(errmsg);
+        return;
+    }
+    GetNextToken();
+
+    char MRopt[10];
+    strcpy(MRopt, "  ");
+
+    // first register is a general register
+
+
+    if (mode == 0) {
+        if (CheckSegReg() == TRUE) {
+            strcpy(MRopt, "");
+
+        }
+        else if (CheckCtrlReg() == TRUE) {
+            strcpy(MRopt, "M");
+        }
+        else
+        {
+            snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
+            ProcessError(errmsg);
+            return;
+        }
+    }
+    else if (mode == 1) {
+        if (CheckGenReg() == TRUE) {
+            strcpy(MRopt, "D");
+        }
+        else
+        {
+            snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
+            ProcessError(errmsg);
+            return;
+        }
+    }
+    else if (mode == 2) {
+        if (CheckGenReg() == TRUE) {
+            strcpy(MRopt, "DM");
+        }
+        else
+        {
+            snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
+            ProcessError(errmsg);
+            return;
+        }
+    }
+    operandType = OT_REGISTER;
+    ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
+    Add_ASTchild(ASTinstruction, ASTop2);
+
+    operandType = OT_NOTHING;
+    ASTopt1 = Create_ASTnode(NODE_OPTION, MRopt, 1);
+    Add_ASTchild(ASTinstruction, ASTopt1);
+
+ //   printf("MR %d    %s\n",  lineNr,  MRopt);
+
+
+}
+
+/// @par Parse MST
+///     - MST   regR,regB
+///     - MST.<S|C> regR, val
+
+void ParseMST() {
+
+    mode = 0;                       // no option found
+
+    // Check Option
+
+    if (tokTyp == T_DOT) {
+
+        GetNextToken();
+        if (tokTyp == T_IDENTIFIER) {
+
+            if (DBG_PARSER) {
+                printf("OPT1 %s ", token);
+            }
+            operandType = OT_NOTHING;
+            ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
+            Add_ASTchild(ASTinstruction, ASTopt1);
+            mode = 1;
+        }
+        GetNextToken();
+    }
+    else {
+        strcpy(buffer, " ");
+        operandType = OT_NOTHING;
+        ASTopt1 = Create_ASTnode(NODE_OPTION, buffer, 1);
+        Add_ASTchild(ASTinstruction, ASTopt1);
+    }
+    // Here should be regR 
+
+    if (CheckGenReg() == TRUE) {
+
+        if (DBG_PARSER) {
+            printf("regR %s ", token);
+        }
+        operandType = OT_REGISTER;
+        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
+        Add_ASTchild(ASTinstruction, ASTop1);
+        strcpy(tokenSave, token);
+    }
+    else
+    {
+        snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
+        ProcessError(errmsg);
+        return;
+    }
+
+    // Here should be a comma
+
+    GetNextToken();
+    if (tokTyp != T_COMMA) {
+        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+        ProcessError(errmsg);
+        return;
+    }
+    GetNextToken();
+
+    if (mode == 1) {
+        value = ParseExpression();
+
+        strcpy(currentScopeName, scopeNameTab[searchScopeLevel]);
+        if (lineERR) return;
+        if (VarType == V_VALUE) {
+
+            if (DBG_PARSER) {
+                printf("[%d]", value);
+            }
+            operandType = OT_VALUE;
+            ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
+            Add_ASTchild(ASTinstruction, ASTop2);
+        }
+
+    }
+    else {
+        // Here should be regB 
+
+        if (CheckGenReg() == TRUE) {
+
+            if (DBG_PARSER) {
+                printf("regB %s ", token);
+            }
+            operandType = OT_REGISTER;
+            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
+            Add_ASTchild(ASTinstruction, ASTop2);
+            strcpy(tokenSave, token);
+        }
+        else
+        {
+            snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
+            ProcessError(errmsg);
+            return;
+        }
+    }
+}
+
+
 /// @par Parse PRB
 ///     - PRB[.<WI>] regR,([regS],regB)[,regA]
 
@@ -1429,11 +1788,8 @@ void ParseLSID() {
 
 }
 
-
-
 /// @par Parse ITLB
 ///     - ITLB[.T] regR,(regA,regB)
-
 
 void ParseITLB() {
 
@@ -1557,9 +1913,6 @@ void ParseITLB() {
         return;
     }
 }
-
-
-
 
 /// @par Parse SHLA
 ///     - SHLA[.<LO> regR, regA, regB, shamt
@@ -3206,9 +3559,6 @@ void ParseDIAG() {
     }
 }
 
-
-
-
 // -----------------------------------------------------------------------
 
 /// @par Parse ADD,ADC,AND,CMP,CMPU,OR,SBC,SUB,XOR
@@ -3531,7 +3881,6 @@ void ParseInstruction() {
         ASTlabel = Create_ASTnode(NODE_LABEL, label, 0);
         Add_ASTchild(ASTinstruction, ASTlabel);
         strcpy(label, "");
-
     }
 
     // build AST NODE OPERATION
@@ -3539,9 +3888,6 @@ void ParseInstruction() {
     operandType = 0;
     ASToperation = Create_ASTnode(NODE_OPERATION, opCode, OpType);
     Add_ASTchild(ASTinstruction, ASToperation);
-
-
-   
 
     switch (OpType) {
 
@@ -3607,8 +3953,6 @@ void ParseInstruction() {
         ParseLDR_STC();
         break;
 
-
-
     case BE:
 
         ParseBE();
@@ -3632,7 +3976,7 @@ void ParseInstruction() {
     case PCA:
     case PTLB:
 
-        printf("not yet implemented\n");
+        ParsePCA_PTLB();
         break;
 
     case CMR:
@@ -3672,12 +4016,12 @@ void ParseInstruction() {
 
     case MR:
 
-        printf("not yet implemented\n");
+        ParseMR();
         break;
 
     case MST:
 
-        printf("not yet implemented\n");
+        ParseMST();
         break;
 
     case RFI:
@@ -3711,10 +4055,6 @@ void ParseInstruction() {
     SkipToEOL();
     return;
 }
-
-
-
-
 
 /// @par Parser ProcessDirective
 
