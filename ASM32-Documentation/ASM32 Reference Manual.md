@@ -358,7 +358,9 @@ Prints the following information:
 Address | maschine code | lineNr source | Source Text
 
  0000 4042005e   25     BEG:    ADD             R1,47
+
  0004 40460023   26                     ADD             GREG1,R2,R3
+
  0008 408a0034   27                     ADD             R2,R3(R4)
 
 all errors during assembly are printed after the source line
@@ -368,7 +370,9 @@ all errors during assembly are printed after the source line
 Prints input lines for the VCPU32 disassembler:
 
 w disasm (0x4042005e) # line 25  BEG:   ADD             R1,47
+
 w disasm (0x40460023) # line 26                 ADD             GREG1,R2,R3
+
 w disasm (0x408a0034) # line 27                 ADD             R2,R3(R4)
 
 ## Lexer
