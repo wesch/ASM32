@@ -185,6 +185,8 @@ bool SearchSymbol(SymNode* node, char* label) {
 void PrintSYM(SymNode* node, int depth) {
 
     if (DBG_SYMTAB == FALSE) {
+
+        printf("======== SUPPRESSED =========\n");
         return;
     }
 
@@ -672,6 +674,8 @@ void GetNextToken() {
 void PrintAST(ASTNode* node, int depth) {
    
     if (DBG_AST == FALSE) {
+
+        printf("======== SUPPRESSED =========\n");
         return;
     }
 
@@ -1044,12 +1048,13 @@ void ParseBRK() {
         Add_ASTchild(ASTinstruction, ASTop2);
     }
 }
-/// @par Parse BR, BV
-///     - OP regR, regB
 
-void ParseBR_BV() {
+/// @par Parse BR
+///     - OP regB[,regR]
 
-    // Here should be regR 
+void ParseBR() {
+
+    // Here should be regB
     if (CheckGenReg() == TRUE) {
 
         if (DBG_PARSER) {
@@ -1068,30 +1073,92 @@ void ParseBR_BV() {
     }
     
 
-    // Here should be a comma
+    // Here could be a comma
 
     GetNextToken();
-    if (tokTyp != T_COMMA) {
-        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-    GetNextToken();
-    if (CheckGenReg() == TRUE) {
-        if (DBG_PARSER) {
-            printf("regB %s ", token);
+    if (tokTyp != T_EOL) {
+        if (tokTyp != T_COMMA) {
+            snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+            ProcessError(errmsg);
+            return;
         }
-        operandType = OT_REGISTER;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop2);
+        GetNextToken();
+        if (CheckGenReg() == TRUE) {
+            if (DBG_PARSER) {
+                printf("regB %s ", token);
+            }
+            operandType = OT_REGISTER;
+            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
+            Add_ASTchild(ASTinstruction, ASTop2);
+        }
+        else {
+            snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+            ProcessError(errmsg);
+            return;
+        }
     }
-    else {
-        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
+
         
 
+}
+
+/// @par Parse BV
+///     - BV (regB)[ ,regR ]
+
+void ParseBV() {
+
+    if (tokTyp != T_LPAREN) {
+        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+        ProcessError(errmsg);
+        return;
+    }
+    GetNextToken();
+
+    // Here should be regB
+    if (CheckGenReg() == TRUE) {
+
+        if (DBG_PARSER) {
+            printf("regR %s ", token);
+        }
+        operandType = OT_REGISTER;
+        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
+        Add_ASTchild(ASTinstruction, ASTop1);
+        strcpy(tokenSave, token);
+    }
+    else
+    {
+        snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
+        ProcessError(errmsg);
+        return;
+    }
+    GetNextToken();
+    if (tokTyp != T_RPAREN) {
+        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+        ProcessError(errmsg);
+        return;
+    }
+    GetNextToken();
+    if (tokTyp != T_EOL) {
+        if (tokTyp != T_COMMA) {
+            snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+            ProcessError(errmsg);
+            return;
+        }
+        GetNextToken();
+        if (CheckGenReg() == TRUE) {
+            if (DBG_PARSER) {
+                printf("regB %s ", token);
+            }
+            operandType = OT_REGISTER;
+            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
+            Add_ASTchild(ASTinstruction, ASTop2);
+        }
+        else {
+            snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+            ProcessError(errmsg);
+            return;
+        }
+    }
 }
 
 /// @par Parse BVE
@@ -2500,7 +2567,7 @@ void ParseDSR() {
 
 
     
-    if (was_option = TRUE) {
+    if (was_option == TRUE) {
         // Here should be a comma
 
         GetNextToken();
@@ -3921,9 +3988,13 @@ void ParseInstruction() {
         break;
 
     case BR:
+
+        ParseBR();
+        break;
+
     case BV:
 
-        ParseBR_BV();
+        ParseBV();
         break;
 
     case CBR:

@@ -306,7 +306,7 @@ const struct opCodeInfo {
     { "ADDIL",   0x08000000 , ADDIL },
 
     { "AND",     0x50020000 , AND },
-    { "ANDB",    0x50010000 , AND },
+    { "ANDB",    0x50000000 , AND },
     { "ANDH",    0x50010000 , AND },
     { "ANDW",    0x50020000 , AND },
 
@@ -355,7 +355,7 @@ const struct opCodeInfo {
     { "MR",      0x28000000 , MR },
     { "MST",     0x2C000000 , MST },
 
-    { "OR",      0x54000000 , OR },
+    { "OR",      0x54020000 , OR },
     { "ORB",     0x54000000 , OR },
     { "ORH",     0x54010000 , OR },
     { "ORW",     0x54020000 , OR },

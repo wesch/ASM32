@@ -74,7 +74,9 @@ bool DBG_TOKEN = FALSE;
 bool DBG_PARSER = FALSE;
 bool DBG_GENBIN = FALSE;
 bool DBG_SYMTAB = TRUE;
-bool DBG_AST = TRUE;
+bool DBG_AST = FALSE;
+bool DBG_SOURCE = TRUE;
+bool DBG_DIS = TRUE;
 
 // --------------------------------------------------------------------------------
 //      token list
@@ -205,6 +207,12 @@ void InsertMC_SRC(SRCNode* node, int depth) {
 /// 
 void PrintSRC(SRCNode* node, int depth) {
 
+    if (DBG_SOURCE == FALSE) {
+
+        printf("======== SUPPRESSED =========\n");
+        return;
+    }
+
     if (!node) return;
 
 //     printf("type=%d %04x %08x %4d\t%s", node->type, node->codeAdr, node->binInstr, node->linenr, node->text);
@@ -241,6 +249,53 @@ void PrintSRC(SRCNode* node, int depth) {
     }
 }
 
+// @par Function to print the SRC for DISASSEMBLER
+/// 
+void PrintSRC_DIS(SRCNode* node, int depth) {
+
+    if (DBG_DIS == FALSE) {
+
+        printf("======== SUPPRESSED =========\n");
+        return;
+    }
+
+    if (!node) return;
+
+    //     printf("type=%d %04x %08x %4d\t%s", node->type, node->codeAdr, node->binInstr, node->linenr, node->text);
+
+    if (node->linenr != 0) {
+        if (node->type == SRC_ERROR) {
+//            printf("                    E: \t%s", node->text);
+        }
+        else if (node->type == SRC_SOURCE &&
+            node->binstatus == B_BIN) {
+            printf("w disasm (0x%08x) # line %d  %s", node->binInstr, node->linenr,node->text);
+            
+        }
+        else if (node->type == SRC_BIN &&
+            node->binstatus == B_BINCHILD) {
+            printf("w disasm (0x%08x) # line %d  %s", node->binInstr, node->linenr, node->text);
+        }
+        else if (node->type == SRC_SOURCE &&
+            node->binstatus == B_NOBIN) {
+//            printf("               %4d\t%s", node->linenr, node->text);
+        }
+        else if (node->type == SRC_INFO) {
+//            printf("                    I: \t%s", node->text);
+        }
+    }
+    else {
+        printf("\n\n");
+        printf("  Program: %s", node->text);
+        printf("--------------------------------------------------------------------------------------\n");
+    }
+
+
+    for (int i = 0; i < node->child_count; i++) {
+        PrintSRC_DIS(node->children[i], depth + 1);
+    }
+}
+
 // -------------------------------------------------------------------------------- 
 //  Main Routine
 // --------------------------------------------------------------------------------
@@ -262,7 +317,7 @@ int main(int argc, char** argv) {
 
     printf("\n\nAssembler start %s\n\n", VERSION);
 
-    printf("Line\tadr:code\tInput disasm\n");
+    // printf("Line\tadr:code\tInput disasm\n");
     printf("--------------------------------------------------------------------------------------\n");
 
     ASTprogram = Create_ASTnode(NODE_PROGRAM, SourceFileName, 0);
@@ -462,6 +517,8 @@ int main(int argc, char** argv) {
     printf("+------------------------------------------------------------------------------------+ \n");
  
     PrintSRC(GlobalSRC, 0);
+
+    PrintSRC_DIS(GlobalSRC, 0);
 
     CloseSourceFile();
     exit(0);

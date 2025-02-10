@@ -775,9 +775,12 @@ void GenBinInstruction() {
     case BR:
     case BV:
 
-        SetGenRegister('R', opchar[0]);
-        SetGenRegister('B', opchar[1]);
+        SetGenRegister('B', opchar[0]);
+        if (strcmp(opchar[1], "") != 0) {
+            SetGenRegister('R', opchar[1]);
+        }
         break;
+
 
     case CBR:
     case CBRU:
@@ -971,7 +974,7 @@ void GenBinInstruction() {
     case PCA:
     case PTLB:
         
-        SetGenRegister('R', opchar[0]);
+        SetGenRegister('A', opchar[0]);
         if (opchar[1][0] == 'S') {
             value = GetSegRegister(opchar[2]);
             if (value > 0 && value < 4) {
@@ -983,17 +986,9 @@ void GenBinInstruction() {
                 break;
             }
             SetGenRegister('B', opchar[2]);
-            if (strcmp(opchar[3], "") != 0) {
-
-                SetGenRegister('A', opchar[3]);
-            }
         }
         else {
             SetGenRegister('B', opchar[1]);
-            if (strcmp(opchar[2], "") != 0) {
-
-                SetGenRegister('A', opchar[2]);
-            }
         }
 
         break;
@@ -1225,7 +1220,7 @@ void WriteBinary() {
     _ltoa(binInstr, buffer, 2);
 
     // printf("%d\t%04x:%08x\t%031s\n", lineNr, codeAdr - 4, binInstr, buffer);
-     printf("w disasm (0x%08x) # line %d\n",  binInstr, lineNr);
+    // printf("w disasm (0x%08x) # line %d\n",  binInstr, lineNr);
 
     if (bin_status == B_BINCHILD) {
 

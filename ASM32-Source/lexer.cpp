@@ -47,14 +47,18 @@ void NewTokenList() {
 
 void PrintTokenList() {
 
+    printf("\n\Token List\n");
+    printf("----------------------------\n");
+
     if (DBG_TOKEN == FALSE) {
+
+        printf("======== SUPPRESSED =========\n");
         return;
     }
 
     struct tokenList* ptr_t = start_t;
 
-    printf("\n\Token List\n");
-    printf("----------------------------\n");
+
 
     while (ptr_t != NULL) {
 
