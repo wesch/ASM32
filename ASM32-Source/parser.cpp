@@ -1049,63 +1049,12 @@ void ParseBRK() {
     }
 }
 
-/// @par Parse BR
-///     - OP regB[,regR]
 
-void ParseBR() {
 
-    // Here should be regB
-    if (CheckGenReg() == TRUE) {
+/// @par Parse BR, BV
+///     - OP (regB)[ ,regR ]
 
-        if (DBG_PARSER) {
-            printf("regR %s ", token);
-        }
-        operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
-        strcpy(tokenSave, token);
-    }
-    else
-    {
-        snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-    
-
-    // Here could be a comma
-
-    GetNextToken();
-    if (tokTyp != T_EOL) {
-        if (tokTyp != T_COMMA) {
-            snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
-            return;
-        }
-        GetNextToken();
-        if (CheckGenReg() == TRUE) {
-            if (DBG_PARSER) {
-                printf("regB %s ", token);
-            }
-            operandType = OT_REGISTER;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop2);
-        }
-        else {
-            snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
-            return;
-        }
-    }
-
-        
-
-}
-
-/// @par Parse BV
-///     - BV (regB)[ ,regR ]
-
-void ParseBV() {
+void ParseBR_BV() {
 
     if (tokTyp != T_LPAREN) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
@@ -3988,13 +3937,9 @@ void ParseInstruction() {
         break;
 
     case BR:
-
-        ParseBR();
-        break;
-
     case BV:
 
-        ParseBV();
+        ParseBR_BV();
         break;
 
     case CBR:

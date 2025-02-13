@@ -335,25 +335,25 @@ void GenBinOption() {
         else if (option[0][0] == 'L' && option[0][1] == 'T') {
             SetBit(13, 1, 1);
         }
-        else if (option[0][0] == 'N' && option[0][1] == 'E') {
+        else if (option[0][0] == 'G' && option[0][1] == 'T') {
             SetBit(12, 1, 1);
         }
-        else if (option[0][0] == 'L' && option[0][1] == 'E') {
+        else if (option[0][0] == 'E' && option[0][1] == 'V') {
             SetBit(12, 1, 1);
             SetBit(13, 1, 1);
         }
-        else if (option[0][0] == 'G' && option[0][1] == 'T') {
+        else if (option[0][0] == 'N' && option[0][1] == 'E') {
             SetBit(11, 1, 1);
+        }
+        else if (option[0][0] == 'L' && option[0][1] == 'E') {
+            SetBit(11, 1, 1);
+            SetBit(13, 1, 1);
         }
         else if (option[0][0] == 'G' && option[0][1] == 'E') {
             SetBit(11, 1, 1);
-            SetBit(13, 1, 1);
-        }
-        else if (option[0][0] == 'H' && option[0][1] == 'I') {
-            SetBit(11, 1, 1);
             SetBit(12, 1, 1);
         }
-        else if (option[0][0] == 'H' && option[0][1] == 'E') {
+        else if (option[0][0] == 'O' && option[0][1] == 'D') {
             SetBit(11, 1, 1);
             SetBit(12, 1, 1);
             SetBit(13, 1, 1);
@@ -1157,7 +1157,7 @@ void GenBinInstruction() {
         }
         else {
             SetGenRegister('A', opchar[1]);
-            SetBit(21, 1, 1);
+            SetBit(10, 1, 1);
         }
         if (opchar[2][0] == 'S') {
             value = GetSegRegister(opchar[2]);
@@ -1200,7 +1200,7 @@ void GenBinInstruction() {
         }
         else {
             SetGenRegister('A', opchar[1]);
-            SetBit(21, 1, 1);
+            SetBit(10, 1, 1);
         }
         SetGenRegister('B', opchar[2]);
         break;
@@ -1239,7 +1239,7 @@ void WriteBinary() {
         node->binstatus = bin_status;
         node->binInstr = binInstr;
         node->codeAdr = codeAdr - 4;
-        node->text = _strdup(infmsg);
+        node->text = strdup(infmsg);
         node->children = NULL;
         node->child_count = 0;
         SRCbin = node;

@@ -74,7 +74,7 @@ bool DBG_TOKEN = FALSE;
 bool DBG_PARSER = FALSE;
 bool DBG_GENBIN = FALSE;
 bool DBG_SYMTAB = TRUE;
-bool DBG_AST = FALSE;
+bool DBG_AST = TRUE;
 bool DBG_SOURCE = TRUE;
 bool DBG_DIS = TRUE;
 
@@ -155,7 +155,7 @@ SRCNode* Create_SRCnode(SRC_NodeType type, const char* text, int lineNr) {
     node->type = type;
     node->linenr = lineNr;
     node->binstatus = bin_status;
-    node->text = _strdup(text);
+    node->text = strdup(text);
     node->children = NULL;
     node->child_count = 0;
     return node;

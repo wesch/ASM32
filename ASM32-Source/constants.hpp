@@ -20,7 +20,7 @@
 #define FALSE 0
 
 
-#define VERSION "A.00.03.22"
+#define VERSION "A.00.03.23"
 
 
 /* Adressen */
@@ -349,7 +349,7 @@ const struct opCodeInfo {
     { "LDO",     0x0C000000 , LDO },
     { "LDPA",    0xE4000000 , LDPA },
     { "LDR",     0xD0000000 , LDR },
-    { "LDA",     0x68000000 , LDA },
+    { "LDA",     0xC8020000 , LDA },
 
     { "LSID",    0x10000000 , LSID },
     { "MR",      0x28000000 , MR },
