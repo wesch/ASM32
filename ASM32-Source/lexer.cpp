@@ -47,7 +47,7 @@ void NewTokenList() {
 
 void PrintTokenList() {
 
-    printf("\n\Token List\n");
+    printf("\nToken List\n");
     printf("----------------------------\n");
 
     if (DBG_TOKEN == FALSE) {

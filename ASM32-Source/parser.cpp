@@ -1805,7 +1805,7 @@ void ParseLSID() {
 }
 
 /// @par Parse ITLB
-///     - ITLB[.T] regR,(regA,regB)
+///     - ITLB[.T] regR,(regS,regB)
 
 void ParseITLB() {
 
@@ -1863,14 +1863,14 @@ void ParseITLB() {
     }
     GetNextToken();
 
-    // Here should be regA
+    // Here should be regS
 
     if (tokTyp == T_IDENTIFIER) {
 
-        if (CheckGenReg() == TRUE) {
+        if (CheckSegReg() == TRUE) {
 
             if (DBG_PARSER) {
-                printf("regA %s ", token);
+                printf("regS %s ", token);
             }
             operandType = OT_REGISTER;
             ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
@@ -4201,7 +4201,7 @@ void ParseDirective() {
                         GetNextToken();
                         char temp[MAX_WORD_LENGTH];
                         strcpy(temp, token);
-                        sprintf(token, "%s%s", "-",temp);
+                        snprintf(token, sizeof(token), "%s%s", "-",temp);
                     }
                     if (currentScopeLevel == SCOPE_MODULE ||
                         currentScopeLevel == SCOPE_FUNCTION) {

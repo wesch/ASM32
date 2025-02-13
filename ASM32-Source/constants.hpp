@@ -143,14 +143,14 @@ typedef enum {
     V_LABEL,
 } SYM_VarType;
 
-/// \brief binsintr in SRCnode
+/// \brief bininstr in SRCnode
 /// 
 typedef enum {
     B_NOBIN,
     B_BIN,
     B_BINCHILD,
     
-} ;
+} BIN_Type;
 
 
 /// \brief opCodes 

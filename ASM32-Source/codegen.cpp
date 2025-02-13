@@ -26,9 +26,17 @@ void SetBit(int pos, int x, int num) {
     }
     int mask = pow(2, num) - 1;
     int val = (x & mask);
-    binInstr = binInstr | val << 31 - pos;
+    binInstr = binInstr | val << (31 - pos);
 }
 
+/// @par clrs 1 bit in instruction
+///    - pos -> Position in instruction
+/// 
+void ClrBit(int pos) {
+
+    binInstr &= ~(1 << (31 - pos));
+
+}
 
 void SetOffset(int pos, int x, int num) {
     
@@ -325,7 +333,7 @@ void GenBinOption() {
 
     case CMR:
 
-        if (strcmp(option[0],"") == NULL) {
+        if (strcmp(option[0],"") == 0) {
             break;
         }
 
@@ -608,7 +616,10 @@ void GenBinInstruction() {
             if (opnum[1] < 0) {
                 
                 SetBit(31, 1,1);
+
             }
+            ClrBit(15);
+            ClrBit(14); // no BYTE,HALF,WORD
         }
         else if (mode == 1) {
 
@@ -616,6 +627,8 @@ void GenBinInstruction() {
             SetGenRegister('A', opchar[1]);
             SetGenRegister('B', opchar[2]);
             SetBit(13, 1,1);
+            ClrBit(15);
+            ClrBit(14); // no BYTE,HALF,WORD
         }
         else if (mode == 2) {
 
@@ -674,11 +687,7 @@ void GenBinInstruction() {
             else
             {
                 value = opnum[0] >> 2;
-                SetBit(30, value, 21);
-                if (value < 0) {
-
-                    SetBit(31, 1, 1);
-                }
+                SetBit(31, value, 22);
             }
         }
 
@@ -696,11 +705,7 @@ void GenBinInstruction() {
                     ProcessError(errmsg);
                 }
                 value = value >> 2;
-                SetBit(30, value, 21);
-                if (value < 0) {
-
-                    SetBit(31, 1, 1);
-                }
+                SetBit(31, value, 22);
             }
             else
             {
@@ -733,11 +738,7 @@ void GenBinInstruction() {
             else
             {
                 value = opnum[1] >> 2;
-                SetBit(30, value, 21);
-                if (value < 0) {
-
-                    SetBit(31, 1, 1);
-                }
+                SetBit(31, value, 22);
             }
         }
 
@@ -755,11 +756,7 @@ void GenBinInstruction() {
                     ProcessError(errmsg);
                 }
                 value = value >> 2;
-                SetBit(30, value, 21);
-                if (value < 0) {
-
-                    SetBit(31, 1, 1);
-                }
+                SetBit(31, value, 22);
             }
             else
             {
@@ -796,11 +793,7 @@ void GenBinInstruction() {
             else
             {
                 value = opnum[2] >> 2;
-                SetBit(22, value, 15);
-                if (value < 0) {
-
-                    SetBit(23, 1, 1);
-                }
+                SetBit(23, value, 16);
             }
         }
 
@@ -817,11 +810,7 @@ void GenBinInstruction() {
                     ProcessError(errmsg);
                 }
                 value = value >> 2;
-                SetBit(22, value, 15);
-                if (value < 0) {
-
-                    SetBit(23, 1, 1);
-                }
+                SetBit(23, value, 16);
             }
             else
             {
@@ -931,12 +920,11 @@ void GenBinInstruction() {
     case BE:
 
         if (operandTyp[0] == OT_VALUE) {
-            SetBit(22, opnum[0], 13);
-            if (opnum[0] < 0) {
 
-                SetBit(23, 1, 1);
-            }
-            value = opnum[0];
+
+            SetBit(23, opnum[0] >> 2, 14);
+
+
             SetGenRegister('A', opchar[1]);
             SetGenRegister('B', opchar[2]);
             if (strcmp(opchar[3], "") != 0) {
@@ -1217,10 +1205,6 @@ void GenBinInstruction() {
 }
 
 void WriteBinary() {
-    _ltoa(binInstr, buffer, 2);
-
-    // printf("%d\t%04x:%08x\t%031s\n", lineNr, codeAdr - 4, binInstr, buffer);
-    // printf("w disasm (0x%08x) # line %d\n",  binInstr, lineNr);
 
     if (bin_status == B_BINCHILD) {
 
@@ -1318,9 +1302,11 @@ void CodeGenAST(ASTNode* node, int depth) {
 
             mode = node->valnum;
             // now we can populate the instruction
-
-            
             break;
+
+        default:
+            snprintf(errmsg, sizeof(errmsg), "This should not happen!!");
+            ProcessError(errmsg);
     }
 
 

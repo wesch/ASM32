@@ -212,8 +212,8 @@ BEG:	ADD		R1,47
 		
 		DIAG	R2,R3,R4,7
 		
-		ITLB	R4,(R5,R6)
-		ITLB.T	R7,(R8,R9)
+		ITLB	R4,(S5,R6)
+		ITLB.T	R7,(S8,R9)
 		
 		LDPA	R5,R4(S2,R3)
 		
