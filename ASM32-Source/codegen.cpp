@@ -612,14 +612,7 @@ void GenBinInstruction() {
         if (mode == 0) {
 
             SetGenRegister('R', opchar[0]);
-            SetBit(30, opnum[1], 17);
-            if (opnum[1] < 0) {
-                
-                SetBit(31, 1,1);
-
-            }
-            ClrBit(15);
-            ClrBit(14); // no BYTE,HALF,WORD
+            SetBit(31, opnum[1], 18);
         }
         else if (mode == 1) {
 
@@ -644,23 +637,18 @@ void GenBinInstruction() {
 
                 strcpy(opchar[2], "R13");
                 SetGenRegister('B', opchar[2]);
-                SetOffset(26, opnum[1], 11);
+                SetOffset(27, opnum[1], 12);
 
             } else if (operandTyp[1] == OT_MEMLOC) {
 
                 strcpy(opchar[2], "R15");
                 SetGenRegister('B', opchar[2]);
-                SetOffset(26, opnum[1], 11);
+                SetOffset(27, opnum[1], 12);
 
             } else if (operandTyp[1] == OT_VALUE) {
 
                 SetGenRegister('B', opchar[2]);
-                SetBit(26, opnum[1], 11);           // offset
-            }
-
-            if (opnum[1] < 0) {
-
-                SetBit(27, 1,1);
+                SetBit(27, opnum[1], 12);           // offset
             }
             SetBit(12, 1,1);
             SetBit(13, 1,1);
@@ -883,22 +871,14 @@ void GenBinInstruction() {
 
         SetGenRegister('R', opchar[0]);
         if (operandTyp[1] == OT_VALUE) {
-            SetBit(26, opnum[1], 11);
-            if (opnum[1] < 0) {
-
-                SetBit(27, 1, 1);
-            }
+            SetBit(27, opnum[1], 12);
             value = opnum[0];
         }
         else if (operandTyp[1] == OT_MEMGLOB) {
 
             strcpy(opchar[2], "R13");
             SetGenRegister('B', opchar[2]);
-            SetOffset(26, opnum[1], 11);
-            if (opnum[1] < 0) {
-
-                SetBit(27, 1, 1);
-            }
+            SetOffset(27, opnum[1], 12);
         }
         if (opchar[2][0] == 'S') {
             value = GetSegRegister(opchar[2]);
@@ -1009,25 +989,20 @@ void GenBinInstruction() {
 
             strcpy(opchar[2], "R13");
             SetGenRegister('B', opchar[2]);
-            SetOffset(26, opnum[1], 17);
+            SetOffset(27, opnum[1], 18);
 
         }
         else if (operandTyp[1] == OT_MEMLOC) {
 
             strcpy(opchar[2], "R15");
             SetGenRegister('B', opchar[2]);
-            SetOffset(26, opnum[1], 17);
+            SetOffset(27, opnum[1], 18);
 
         }
         else if (operandTyp[1] == OT_VALUE) {
 
             SetGenRegister('B', opchar[2]);
-            SetBit(26, opnum[1], 17);           // offset
-        }
-
-        if (opnum[1] < 0) {
-
-            SetBit(27, 1, 1);
+            SetBit(27, opnum[1], 18);           // offset
         }
         break;
 
@@ -1126,22 +1101,14 @@ void GenBinInstruction() {
 
         SetGenRegister('R', opchar[0]);
         if (operandTyp[1] == OT_VALUE) {
-            SetBit(26, opnum[1], 11);
-            if (opnum[1] < 0) {
-
-                SetBit(27, 1, 1);
-            }
+            SetBit(27, opnum[1], 12);
             value = opnum[0];
         }
         else if (operandTyp[1] == OT_MEMGLOB) {
 
                 strcpy(opchar[2], "R13");
                 SetGenRegister('B', opchar[2]);
-                SetOffset(26, opnum[1], 11);
-                if (opnum[1] < 0) {
-
-                    SetBit(27, 1, 1);
-                }
+                SetOffset(27, opnum[1], 12);
         }
         else {
             SetGenRegister('A', opchar[1]);
@@ -1169,22 +1136,14 @@ void GenBinInstruction() {
 
         SetGenRegister('R', opchar[0]);
         if (operandTyp[1] == OT_VALUE) {
-            SetBit(26, opnum[1], 11);
-            if (opnum[1] < 0) {
-
-                SetBit(27, 1, 1);
-            }
+            SetBit(27, opnum[1], 12);
             value = opnum[0];
         }
         else if (operandTyp[1] == OT_MEMGLOB) {
 
             strcpy(opchar[2], "R13");
             SetGenRegister('B', opchar[2]);
-            SetOffset(26, opnum[1], 11);
-            if (opnum[1] < 0) {
-
-                SetBit(27, 1, 1);
-            }
+            SetOffset(27, opnum[1], 12);
         }
         else {
             SetGenRegister('A', opchar[1]);

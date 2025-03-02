@@ -22,43 +22,43 @@ V5:		.BYTE
 ; Computational instructions
 ; =====================================
 
-BEG:	ADD		R1,47
+BEG:	ADD		R1,-47
 		ADD		GREG1,R2,R3
 		ADD		R2,R3(R4)
-		ADD		R3,45(R5)
+		ADD		R3,-45(R5)
 		ADD		R4,H(R6)
 		ADDW	R5,V3
 		ADDB	R6,V5
 		ADDH	R1,R2(R3)
-		ADD.L	R1,47
+		ADD.L	R1,-47
 		ADD.O	GREG1,R2,R3
-		ADD.LO	R1,47
+		ADD.LO	R1,-47
 
 		ADCW	R5,V3
 		ADCB	R6,V5
 		ADCH	R1,R2(R3)
-		ADC.L	R1,47
+		ADC.L	R1,-47
 		ADC.O	GREG1,R2,R3
-		ADC.LO	R1,47		
+		ADC.LO	R1,-47		
 				
 		SBCW	R5,V3
 		SBCB	R6,V5
 		SBCH	R1,R2(R3)
-		SBC.L	R1,47
+		SBC.L	R1,-47
 		SBC.O	GREG1,R2,R3
-		SBC.LO	R1,47
+		SBC.LO	R1,-47
 
 		SUBW	R5,V3
 		SUBB	R6,V5
 		SUBH	R1,R2(R3)
-		SUB.L	R1,47
+		SUB.L	R1,-47
 		SUB.O	GREG1,R2,R3
-		SUB.LO	R1,47
+		SUB.LO	R1,-47
 
-		AND		R1,43
+		AND		R1,-43
 		AND		R1,V3
 		AND		R1,R2(R3)
-		AND 	R3,45(R5)
+		AND 	R3,-45(R5)
 		AND 	R3,45(R5)
 		ANDW 	R3,45(R5)
 		ANDH 	R3,45(R5)		
@@ -69,7 +69,7 @@ BEG:	ADD		R1,47
 		OR		R1,V3
 		OR		R1,R2(R3)
 		OR 		R3,45(R5)
-		OR 		R3,45(R5)
+		OR 		R3,-45(R5)
 		ORW 	R3,45(R5)
 		ORH 	R3,45(R5)		
 		OR.N	R1,R2(R3)
@@ -109,7 +109,7 @@ BEG:	ADD		R1,47
 		CMP.LT	R3,V1
 		CMP.NE	R4,R3
 		CMP.LE	R5,R2(R4)
-		CMP.LE	R5,43(R6)
+		CMP.LE	R5,-43(R6)
 		CMP.LE	R5,R3,R4
 		
 		CMPU.EQ	R2,23
@@ -147,13 +147,13 @@ BEG:	ADD		R1,47
 		BVE		R5(R6),R7
 		
 		CBR.EQ	R1,R2,36
-		CBR.LT	R1,R2,36		
+		CBR.LT	R1,R2,-36		
 		CBR.NE	R1,R2,36		
 		CBR.LE	R1,R2,36		
 
 		CBRU.EQ	R1,R2,32
 		CBRU.LT	R1,R2,32		
-		CBRU.NE	R1,R2,32		
+		CBRU.NE	R1,R2,-32		
 		CBRU.LE	R1,R2,32		
 		
 		GATE	R5,40
@@ -179,21 +179,21 @@ BEG:	ADD		R1,47
 		LD		R2, 45+H(R3)
 		LD.M	R1,H(R3)
 		LD.M	R1,23(S1,R3)
-		LD.M	R1,23(S2,R3)
+		LD.M	R1,-23(S2,R3)
 		LD.M	R1,23(S3,R3)
 		LD		R5,V1
 
 		LDA		R3, R4(R5)
 		LDA		R2, 45(R3)
 		LDA.M	R3, R4(R5)
-		LDA.M	R2, 45(R3)
+		LDA.M	R2, -45(R3)
 		
 		LDR		R1, 25(R2)
 		LDR		R2, 25(S3,R3)
 		LDR		R3,V1
 		
 		ST.M	R1,23(R3)
-		ST		R2,223(S1,R2)
+		ST		R2,-223(S1,R2)
 		STW		R3,R4(S2,R5)
 		STH		R3, V2
 		
