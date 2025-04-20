@@ -203,6 +203,9 @@ void PrintSYM(SymNode* node, int depth) {
         (node->type == SCOPE_FUNCTION) ? "F" :
         (node->type == SCOPE_DIRECT) ? "D" :
         "Unknown", node->scopeLevel,node->codeAdr, node->dataAdr, node->label, node->func, node->value, node->vartype, node->linenr,node->scopeName);
+    if (node->type == SCOPE_PROGRAM) {
+        printf("\t\tSource File: %s\n", node->value);
+    }
 
     for (int i = 0; i < node->child_count; i++) {
         PrintSYM(node->children[i], depth + 1);
@@ -777,6 +780,7 @@ void PrintSymbolTokenCode(int i) {
 
 void ParseLabel() {
     strcpy(label, tokenSave);
+    StrToUpper(label);
 
 }
 
@@ -4237,6 +4241,12 @@ void ParseDirective() {
                             dataAdr = (dataAdr + 1);
                             break;
                         }
+                    }
+                    else {
+                        snprintf(errmsg, sizeof(errmsg), "Directive %s:\t .%s not allowed outside module or function", label,tokenSave);
+                        ProcessError(errmsg);
+                        SkipToEOL();
+                        return;
                     }
                     if (currentScopeLevel == SCOPE_FUNCTION) {
 
