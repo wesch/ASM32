@@ -404,13 +404,35 @@ int main(int argc, char** argv) {
     strcpy(dirCode, "REG");
     strcpy(token, "R13");
     AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+
     strcpy(label, "RL");
     strcpy(dirCode, "REG");
     strcpy(token, "R14");
     AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+
     strcpy(label, "SP");
     strcpy(dirCode, "REG");
     strcpy(token, "R15");
+    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+
+    strcpy(label, "ARG0");
+    strcpy(dirCode, "REG");
+    strcpy(token, "R11");
+    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+
+    strcpy(label, "ARG1");
+    strcpy(dirCode, "REG");
+    strcpy(token, "R10");
+    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+
+    strcpy(label, "ARG2");
+    strcpy(dirCode, "REG");
+    strcpy(token, "R9");
+    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+
+    strcpy(label, "ARG3");
+    strcpy(dirCode, "REG");
+    strcpy(token, "R8");
     AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
     currentScopeType = SCOPE_PROGRAM;

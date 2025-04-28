@@ -300,7 +300,7 @@ bool CheckGenReg() {
    
     StrToUpper(token);
     
-    if (token[0] == 'R') {
+    if (token[0] == 'R' && token[1] != 'L') {
 
         if (strlen(token) == 3) {
 

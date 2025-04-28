@@ -1,0 +1,159 @@
+========================================
+			CHANGELOG ASM32
+========================================
+
+241209	VERSION "A.00.03.02"
+----------------------------
+ParseInstr: 	erstellen AST wieder in ParseModInstr eingebaut
+ParseFactor:	VarTypes eingebaut handling global/local offen
+				Zeilen 411 
+
+
+241210	VERSION "A.00.03.03"
+----------------------------
+ParseDirective: alles auf DirType umgestellt
+				alignment für .WORD und .HALF
+				expresesion mit Memoryadresse funktioniert
+				Memory wird als MODE 3 erkannt
+ASM32:			default register name DP, RL, SP
+
+241211	VERSION "A.00.03.04"
+----------------------------
+GenBinary:		prep Option handling 
+					ADD, ADC, SBC, SUB, SHLA
+					AND, OR, CMP, CMPU,	XOR,EXTR,PCA,PTLB,ITLB,DSR,MR,PRB,DEP,MST
+
+				prep mode 0-3 für ADD, ADC, AND, CMP, CMPU, OR, SBC, SUB, XOR
+
+241212	VERSION "A.00.03.05"
+----------------------------	
+ParseDirective: Alignment angepasst (local Variablen umrechnung noch offen)
+
+
+241213	VERSION "A.00.03.06"
+----------------------------	
+ParseDirective: Name dr Funktion gespeichert
+ParseModInstr:  Falls in Funktion einen Label mit Funktionsname bei der ersten Instruktion erstellen
+
+241213	VERSION "A.00.03.07"
+----------------------------
+ParseDirective:	Negative Werte bei WOR,HALF und BYTE werden richtig in SYMTAB abgelegt
+GenBinary:		SetBit und SetRegister, Optionen und Mode für alle arithmetischen Ops fertig 
+
+241213	VERSION "A.00.03.08"
+----------------------------
+SetBit:	Erweitert um Maske und wertebereich check
+SetRegister: Erweitert um Check Register #
+
+241213	VERSION "A.00.03.09"
+----------------------------
+in GenBinOption und GenBinInstruction aufgeteilt
+ParseModInstr: erweiterete Behandlung von Instructionsfehlern
+GenBinOption: alle bits für 1-er options gesetzt
+constants.h: alle Instructionen eingetragen
+
+241222	VERSION "A.00.03.10"
+----------------------------
+SetOffset: Wenn offset zu groß, wird ADDIL eingeschoben
+WriteBinary: binInstr wird mit codeAdr ausgegeben.
+GenBinOption: opt1, opt2 und opt3 implementiert
+				Fehlermeldungen mit lineNr und Column
+
+241225	VERSION "A.00.03.11"
+----------------------------
+GenBinOption:N und C option bei Or und AND exclusiv
+ParseADDIL_LDIL: neu 
+ParseBR_BV:neu
+GenBinInstr: ADDIL,LDIL,BR,BV
+
+250102	VERSION "A.00.03.12"
+----------------------------
+SetOffset: Handling für normale Offsets korrigiert.
+GenBinOption: Handling Option 1 für CMP und CMPU korrigiert
+CBR und CBRU fertig bis auf Adresslabel
+
+250105	VERSION "A.00.03.13"
+----------------------------
+Variablentypen in Symboltabelle Namen geändert und um V_Label erweitert.
+ParseInstr: Fehler behobn wennn LABEL vor Instruktion steht wurde operand nicht mehr richtig erkannt.
+ParseInstr: Fehler behoben, wenn Zeile Fehler enthält, wird zur nächsten Zeile gesprungen
+ParseCBR_CBRU:  SChreibt den Labelnamen  und den Labeltyp in AST
+Pfad für Test.s geändert in Verzeichnis in dem die sourcen liegen
+
+250106	VERSION "A.00.03.14"
+----------------------------
+SearchLabel und SearchLabelAll: suchen nach label in der SYMTAB
+CBR und CBRU fertig für Label und direkter offset
+CheckOpcodeMode: handling korrigiert, wenn fehler aufgetrtene wurde folgende opcode nicht erkannt.
+dummy instruction at the end of AST to ensure complete processing
+
+250114	VERSION "A.00.03.15"
+----------------------------
+Adressoffset wird jetzt scopeabhängig gesucht 
+scopetab[currentScopelevel] in AST
+Symboltabelle node adr in AST
+Test mit mehreren Funktionen erfolgreich
+BVE, B, GATE, BE, BRK fertig
+
+250115	VERSION "A.00.03.16"
+----------------------------
+Scopname wurde in ParseExpression überschrieben, wenn ein symbol auf höherer Ebene gefunden wurde. 
+	Korrigiert Create_ASTnode
+Sourcecode, Fehlermeldungen gemeinsam ausgeben. 
+Verkettete Liste SRC_Node
+Variablen Adressen ist offen
+
+250117	VERSION "A.00.03.17"
+----------------------------
+constants.h: bininstr für BYTE,WORD geändert
+GenBinInstruction: CBR,CBRU, B, GATE word alignment und shift ok.
+
+
+250118	VERSION "A.00.03.18"
+----------------------------
+SetOffset:
+WriteBinary:
+PrintSRC:		generierte zusatzinstruktionen wegen großem offset werden ausegegeben
+Instruktion LD, ST fertig bis auf Memory als Variable
+
+250118	VERSION "A.00.03.19"
+----------------------------
+LD,LDA,ST,STA richtige Behandlung offset, Zahl, EQU Expression
+
+250202	VERSION "A.00.03.20"
+----------------------------
+CMR, DEP, DSR, EXTR, LDO, LDR fertig
+
+250203	VERSION "A.00.03.21"
+----------------------------
+STC, SHLA, LDPA,DIAG, ITLB, LSID
+
+250203	VERSION "A.00.03.22"
+----------------------------
+PCA,PTLB,MR, MST
+all existing instructions ready for test
+
+250211	VERSION "A.00.03.23"
+----------------------------
+Fixed all issues after Test
+
+250302	VERSION "A.00.03.24"
+----------------------------
+Sign Bits Change
+
+
+============================================================================================
+	TODO
+============================================================================================
+
+** binaerfile muss ggf. in big endian gewandelt werden
+
+** flag für big-endian bzw. little-endian
+
+** bei allen instructionen mit numerischen werten --> Expression Parser
+
+** Strukturen .RECORD enthält Variablen .WORD, .HALF, .BYTE Konzept 
+
+
+	
+
