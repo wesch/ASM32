@@ -1,42 +1,39 @@
 ; ======================================
-; Example program for binary file format
+; Example program ASM32
 ; ======================================
 
+; KSO:		.GLOBAL		adr=0x1000_0000
 
+;			.ENDGLOBAL
 
-H:		.EQU	52
-; ----------------------------------------------------------------------
-M1:		.MODULE		
-; ----------------------------------------------------------------------
+IVA:		.MODULE		
+W1:			.WORD		
+W2:			.WORD
+H1:			.HALF
 
-GREG1:		.REG	R1
+			.IMPORT	UTIL
 
-V1:		.WORD  	100
-V2:		.HALF  	150
-V3:		.WORD  	170
+MAIN:		.FUNCTION	
+			ADCH	R1,R2(R3)
+			ADC.L	R1,-47
+			ADC.O	R1,R2,W1
+			B	FUNC1, RL
+			.ENDFUNCTION
 
+INIT:		.FUNCTION
+			.ENDFUNCTION
+			.ENDMODULE
 
-BEGIN:		LDW 	ARG0, V1
-		LDW	ARG1, V3
-		B	FUNC1, RL
+UTIL:		.MODULE
 
-; ----------------------------------------------------------------------
-F1:		.FUNCTION
-; ----------------------------------------------------------------------
-FUNC1:	ST		RL,-8(SP)
+			.EXPORT	FUNC1
+FUNC1:		.FUNCTION
 
-		LDO		SP, 56(SP)
-V4:		.WORD	250
+STATUS:		.WORD		
 
-		ADD	ARG0, ARG1, V4				
-		BV (RL)
-; ----------------------------------------------------------------------
-		.ENDFUNCTION
+			LD	RL, -8(SP)
+			BV	(RL) 
+			.ENDFUNCTION
 
-		.ENDMODULE
-; ----------------------------------------------------------------------			
-	        .END 			
-; ----------------------------------------------------------------------
-
-
-	
+			.ENDMODULE
+			.ENDPROGRAM

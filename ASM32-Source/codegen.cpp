@@ -151,7 +151,7 @@ void SetMRRegister(char* regname) {
             return;
         }
     }
-    SetBit(31, value, 4);
+    SetBit(31, value, 5);
 }
 
 /// @par provides segment register number

@@ -300,7 +300,7 @@ bool CheckGenReg() {
    
     StrToUpper(token);
     
-    if (token[0] == 'R' && token[1] != 'L') {
+    if ((token[0] == 'R' && token[1] != 'L' )  && (token[0] == 'R' && token[1] != 'E')){
 
         if (strlen(token) == 3) {
 
@@ -4170,10 +4170,20 @@ void ParseDirective() {
                     AddScope(currentScopeType, label, dirCode, symValue, lineNr);
                     dataAdr = 0;
                     strcpy(func_entry, label);
-
-
+                    if ((main_func_detected == TRUE) && (strcmp(label,"MAIN") == 0)) {
+                        snprintf(errmsg, sizeof(errmsg), "There is only one MAIN function allowed");
+                        ProcessError(errmsg);
+                        SkipToEOL();
+                        return;
+                    }
+                    else
+                    {
+                        main_func_detected = TRUE;
+                    }
                     break;
 
+                case D_EXPORT:
+                case D_IMPORT:
                 case D_EQU:
                 case D_REG:
 
@@ -4191,6 +4201,23 @@ void ParseDirective() {
                     }
                     break;
 
+                case D_STRING:
+                    if (currentScopeLevel == SCOPE_MODULE) {
+                        VarType = V_MEMGLOBAL;
+                    }
+                    if (currentScopeLevel == SCOPE_FUNCTION) {
+                        VarType = V_MEMLOCAL;
+                    }
+                    GetNextToken();
+                    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+
+                    // data adr berechnen
+
+                    dataAdr = dataAdr + strlen(token);
+
+                    break;
+
+                case D_DOUBLE:
                 case D_WORD:
                 case D_HALF:
                 case D_BYTE:
@@ -4210,6 +4237,13 @@ void ParseDirective() {
                     if (currentScopeLevel == SCOPE_MODULE ||
                         currentScopeLevel == SCOPE_FUNCTION) {
                         switch (DirType) {
+
+                        case D_DOUBLE:
+                            if ((dataAdr % 8) != 0) {
+                                dataAdr = ((dataAdr / 8) * 8) + 8;
+                            }
+                            break;
+
                         case D_WORD:
                             if ((dataAdr % 4) != 0) {
                                 dataAdr = ((dataAdr / 4) * 4) + 4;
@@ -4224,6 +4258,13 @@ void ParseDirective() {
                         }
                         AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
                         switch (DirType) {
+
+                        case D_DOUBLE:
+                            if ((dataAdr % 8) == 0) {
+                                dataAdr = (dataAdr  + 8);
+                            }
+                            break;
+
                         case D_WORD:
                             if ((dataAdr % 4) == 0) {
                                 dataAdr = (dataAdr + 4);

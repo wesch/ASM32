@@ -50,7 +50,7 @@ extern char        opt2[MAX_WORD_LENGTH];       // option for AST
 extern int         codeAdr;                        // adress counter code
 extern int         dataAdr;                        // adress counter data
 extern char        func_entry[MAX_WORD_LENGTH];
-
+extern bool        main_func_detected;
 extern char opchar[5][10];                  
 extern int  opnum[5];
 extern char option[2][10];

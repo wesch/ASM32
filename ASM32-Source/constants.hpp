@@ -15,12 +15,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <cstdint>
+#include <elfio/elfio.hpp>
 
 #define TRUE 1
 #define FALSE 0
 
 
-#define VERSION "A.00.03.24"
+#define VERSION "A.00.1.00"
 
 
 /* Adressen */
@@ -208,20 +209,22 @@ typedef enum {
     D_BEGIN,
     D_BYTE,
     D_DATA,
-    D_END,
     D_EQU,
     D_HALF,
+    D_IMPORT,
+    D_EXPORT,
     D_REG,
     D_STRING,
     D_WORD,
+    D_DOUBLE,
+    D_STR,
     D_GLOBAL,
     D_PROGRAM,
     D_MODULE,
     D_ENDMODULE,
     D_FUNCTION,
-    D_ENDFUNCTION,
-    D_CALL,
-    D_MAIN
+    D_ENDFUNCTION
+
 
 } Directives;
 
@@ -236,20 +239,20 @@ const struct directInfo {
     { "BEGIN" ,         D_BEGIN },
     { "BYTE",           D_BYTE },
     { "DATA" ,          D_DATA },
-    { "END" ,           D_END },
     { "EQU" ,           D_EQU },
     { "HALF" ,          D_HALF },
+    { "EXPORT" ,        D_EXPORT},
+    { "IMPORT" ,        D_IMPORT},
     { "REG" ,           D_REG },
     { "STRING" ,        D_STRING },
     { "WORD" ,          D_WORD },
+    { "DOUBLE",         D_DOUBLE },
     { "GLOBAL" ,        D_GLOBAL },
     { "PROGRAM" ,       D_PROGRAM },
     { "MODULE" ,        D_MODULE },
     { "ENDMODULE" ,     D_ENDMODULE },
     { "FUNCTION" ,      D_FUNCTION },
-    { "ENDFUNCTION" ,   D_ENDFUNCTION },
-    { "CALL",           D_CALL },
-    { "MAIN",           D_MAIN }
+    { "ENDFUNCTION" ,   D_ENDFUNCTION }
 
 } ;
 
