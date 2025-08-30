@@ -16,12 +16,13 @@
 #include <string.h>
 #include <cstdint>
 #include <elfio/elfio.hpp>
+#include <inttypes.h>
 
 #define TRUE 1
 #define FALSE 0
 
 
-#define VERSION "A.00.1.00"
+#define VERSION "A.00.1.05"
 
 
 /* Adressen */
@@ -70,6 +71,7 @@ typedef enum {
     T_COLON,
     T_DOT,
     T_LPAREN,
+    T_QUOT,
     T_RPAREN,
     T_L22,
     T_R10,
@@ -78,6 +80,7 @@ typedef enum {
     T_OPCODE,
     T_LABEL,
     T_MINUS,
+    T_UNDERSCORE,
     T_PLUS,
     T_MUL,
     T_DIV,
@@ -127,7 +130,6 @@ typedef enum {
 /// \brief ScopeType Symboltable 
 
 typedef enum {
-    SCOPE_GLOBAL = 0,     // Globaler Scope
     SCOPE_PROGRAM = 1,    // Programm- oder Datei-Scope
     SCOPE_MODULE = 2,     // Modul-Scope
     SCOPE_FUNCTION = 3,   // Funktions-Scope (lokal)
@@ -153,6 +155,12 @@ typedef enum {
     
 } BIN_Type;
 
+
+typedef enum {
+    P_UNDEFINED,
+    P_STANDALONE,
+    P_MODULE,
+};
 
 /// \brief opCodes 
 
@@ -208,6 +216,7 @@ typedef enum {
     D_ALIGN,
     D_BEGIN,
     D_BYTE,
+    D_CODE,
     D_DATA,
     D_EQU,
     D_HALF,
@@ -238,6 +247,7 @@ const struct directInfo {
     { "ALIGN" ,         D_ALIGN },
     { "BEGIN" ,         D_BEGIN },
     { "BYTE",           D_BYTE },
+    { "CODE",           D_CODE },
     { "DATA" ,          D_DATA },
     { "EQU" ,           D_EQU },
     { "HALF" ,          D_HALF },
@@ -255,6 +265,9 @@ const struct directInfo {
     { "ENDFUNCTION" ,   D_ENDFUNCTION }
 
 } ;
+
+
+
 
 /// \brief Table of other reserved words
 

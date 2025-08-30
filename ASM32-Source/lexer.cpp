@@ -104,6 +104,19 @@ void GetToken() {
             strcpy(token, ",");
             break;
         }
+
+        else if (ch == '_') {
+            tokTyp = T_UNDERSCORE;
+            strcpy(token, "_");
+            break;
+        }
+
+        else if (ch == '"') {
+            tokTyp = T_QUOT;
+            strcpy(token, "\"");
+            break;
+        }
+
         else if (ch == ':') {
             tokTyp = T_COLON;
             strcpy(token, ":");
@@ -206,7 +219,7 @@ void GetToken() {
 
             column = ind;
             tokTyp = T_IDENTIFIER;
-            while (isalpha(ch) || isdigit(ch)) {
+            while (isalpha(ch) || isdigit(ch) || isunderline(ch)) {
 
                 token[j] = ch;
                 j++;
@@ -227,20 +240,24 @@ void GetToken() {
                 j = 2;
                 ind = ind + 2;
                 ch = sl[ind];
-                while (HexCharToInt(ch) >= 0) {
-                    token[j] = ch;
-                    j++;
+                while (isxdigit(ch) || isunderline(ch)) {
+                    if (ch != '_') {
+                        token[j] = ch;
+                        j++;
+                    }
                     ind++;
                     ch = sl[ind];
+
                 }
             }
             else {
-                while (isdigit(ch)) {
-
-                    token[j] = ch;
-                    j++;
-                    ind++;
-                    ch = sl[ind];
+                while (isdigit(ch) || isunderline(ch)) {
+                    if (ch != '_') {
+                        token[j] = ch;
+                        j++;
+                        ind++;
+                        ch = sl[ind];
+                    }
                 }
             }
             token[j] = '\0';

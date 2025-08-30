@@ -197,7 +197,6 @@ void PrintSYM(SymNode* node, int depth) {
     }
 
     printf("%s:\t%d\t%04x\t%04x\t%s\t%.5s\t%.5s\t%d\t%d\t%s\n", 
-        (node->type == SCOPE_GLOBAL) ? "G" :
         (node->type == SCOPE_PROGRAM) ? "P" :
         (node->type == SCOPE_MODULE) ? "M" :
         (node->type == SCOPE_FUNCTION) ? "F" :
@@ -499,8 +498,12 @@ bool CheckCtrlReg() {
 
 
 
-int ParseFactor() {
-    int n = 0;
+int64_t  ParseFactor() {
+    int64_t  n = 0;
+    intmax_t tmp;
+
+    char* endptr;
+    errno = 0;
 
     if (tokTyp == T_LPAREN) {
 
@@ -521,8 +524,8 @@ int ParseFactor() {
         
         if (tokTyp == T_NUM) {
 
-            int result = sscanf(token, "%i", &n);
-
+            tmp = strtoimax(token, &endptr, 0);
+            n = (int64_t)tmp;
         }
         else if (tokTyp == T_IDENTIFIER) {
             searchScopeLevel = currentScopeLevel;
@@ -565,7 +568,7 @@ int ParseFactor() {
             }
 
             if (VarType == V_VALUE) {
-                n = atoi(token);
+                n = atoll(token);
             }
             else if (VarType == V_MEMGLOBAL) {
                 ///< ??? CHeck 
@@ -583,8 +586,8 @@ int ParseFactor() {
     return n; 
 }
 
-int ParseTerm() {
-    int first, second;
+int64_t  ParseTerm() {
+    int64_t  first, second;
 
     first = ParseFactor(); 
     if (lineERR) return 0;
@@ -622,8 +625,8 @@ int ParseTerm() {
 
 /// @par Process expression
 /// 
-int ParseExpression() {
-    int first, second;
+int64_t  ParseExpression() {
+    int64_t  first, second;
 
     first = ParseTerm(); 
     if (lineERR) return 0;
@@ -723,7 +726,9 @@ void PrintTokenCode(int i) {
     case T_NUM:         printf("NUM"); break;
     case T_COMMA:       printf("COMMA"); break;
     case T_COLON:       printf("COLON"); break;
+    case T_QUOT:        printf("QUOT"); break;
     case T_DOT:         printf("DOT"); break;
+    case T_UNDERSCORE:  printf("UNDERSCORE"); break;
     case T_LPAREN:      printf("LPAREN"); break;
     case T_RPAREN:      printf("RPAREN"); break;
     case T_COMMENT:     printf("COMMENT"); break;
@@ -4081,8 +4086,9 @@ void ParseInstruction() {
 void ParseDirective() {
     // printf("DIRECTIVE %s\t", token_old);
          // Opcode
- 
+
     int i = 0;
+    int align;
     VarType = V_VALUE;
 
     strcpy(dirCode, tokenSave);
@@ -4101,7 +4107,7 @@ void ParseDirective() {
             break;
         }
     }
-   
+
     if (dirCode_found == FALSE) {
 
         snprintf(errmsg, sizeof(errmsg), "Invalid directive %s", token);
@@ -4120,192 +4126,381 @@ void ParseDirective() {
     }
     if (dirCode_found == TRUE) {
 
-        if (DirType == D_ENDMODULE ||
-            DirType == D_ENDFUNCTION)  {
+        switch (DirType) {
 
-            if (currentScopeLevel > 1) {
-                scopeTab[currentScopeLevel--] = NULL;
+        case D_GLOBAL:
+
+            if (prgType == P_UNDEFINED) {
+                prgType = P_STANDALONE;
             }
-            else
-            {
-                strcpy(errmsg, "Scopelevel can not be reduced below program level");
+            else {
+                snprintf(errmsg, sizeof(errmsg), "invalid %s in Module program", token);
                 ProcessError(errmsg);
                 SkipToEOL();
                 return;
-
             }
-            // bei ENDFUCNTION
-            //  adressen im stack berechnen
-            //  entsprechende symbole im stack suchen und dataAdr updaten
 
-        }
-        else
-        {
-            symFound = FALSE;
-            searchScopeLevel = currentScopeLevel;
-            SearchSymLevel(scopeTab[searchScopeLevel], label, 0);
+            break;
 
-            if (symFound == FALSE) {
+        case D_MODULE:
 
-                strcpy(symValue, "");
+            if (prgType == P_UNDEFINED) {
+                prgType = P_MODULE;
+            }
+            else {
+                snprintf(errmsg, sizeof(errmsg), "invalid %s in Standalone program", token);
+                ProcessError(errmsg);
+                SkipToEOL();
+                return;
+            }
+            break;
 
-                switch (DirType) {
 
-                case D_MODULE:
+        case D_CODE:
 
-                    currentScopeType = SCOPE_MODULE;
-                    VarType = V_VALUE;
-                    dataAdr = 0;
-                    AddScope(currentScopeType, label, dirCode, symValue, lineNr);
-                    dataAdr = 0;
-                    break;
-
-                case D_FUNCTION:
-
-                    currentScopeType = SCOPE_FUNCTION;
-                    VarType = V_VALUE;
-                    dataAdr = 0;
-                    GetNextToken();
-                    strcpy(symValue, token);
-                    AddScope(currentScopeType, label, dirCode, symValue, lineNr);
-                    dataAdr = 0;
-                    strcpy(func_entry, label);
-                    if ((main_func_detected == TRUE) && (strcmp(label,"MAIN") == 0)) {
-                        snprintf(errmsg, sizeof(errmsg), "There is only one MAIN function allowed");
-                        ProcessError(errmsg);
-                        SkipToEOL();
-                        return;
-                    }
-                    else
-                    {
-                        main_func_detected = TRUE;
-                    }
-                    break;
-
-                case D_EXPORT:
-                case D_IMPORT:
-                case D_EQU:
-                case D_REG:
-
-                    GetNextToken();
-                    if (CheckReservedWord()) {
-
-                        AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
-                    }
-                    else
-                    {
-                        snprintf(errmsg, sizeof(errmsg), "Symbol %s is a reserved word", label);
-                        ProcessError(errmsg);
-                        SkipToEOL();
-                        return;
-                    }
-                    break;
-
-                case D_STRING:
-                    if (currentScopeLevel == SCOPE_MODULE) {
-                        VarType = V_MEMGLOBAL;
-                    }
-                    if (currentScopeLevel == SCOPE_FUNCTION) {
-                        VarType = V_MEMLOCAL;
-                    }
-                    GetNextToken();
-                    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
-
-                    // data adr berechnen
-
-                    dataAdr = dataAdr + strlen(token);
-
-                    break;
-
-                case D_DOUBLE:
-                case D_WORD:
-                case D_HALF:
-                case D_BYTE:
-                    if (currentScopeLevel == SCOPE_MODULE) {
-                        VarType = V_MEMGLOBAL;
-                    }
-                    if (currentScopeLevel == SCOPE_FUNCTION) {
-                        VarType = V_MEMLOCAL;
-                    }
-                    GetNextToken();
-                    if (token[0] == '-') {
+            if (prgType == P_STANDALONE) {
+                GetNextToken();
+                StrToUpper(token);
+                do
+                {
+                    if (strcmp(token, "ADDR") == 0) {
                         GetNextToken();
-                        char temp[MAX_WORD_LENGTH];
-                        strcpy(temp, token);
-                        snprintf(token, sizeof(token), "%s%s", "-",temp);
+                        O_CODE_ADDR = ParseExpression();
+                        StrToUpper(token);
                     }
-                    if (currentScopeLevel == SCOPE_MODULE ||
-                        currentScopeLevel == SCOPE_FUNCTION) {
-                        switch (DirType) {
-
-                        case D_DOUBLE:
-                            if ((dataAdr % 8) != 0) {
-                                dataAdr = ((dataAdr / 8) * 8) + 8;
-                            }
-                            break;
-
-                        case D_WORD:
-                            if ((dataAdr % 4) != 0) {
-                                dataAdr = ((dataAdr / 4) * 4) + 4;
-                            }
-                            break;
-
-                        case D_HALF:
-                            if ((dataAdr % 2) != 0) {
-                                dataAdr = ((dataAdr / 2) * 2) + 2;
-                            }
-                            break;
+                    else if (strcmp(token, "ALIGN") == 0) {
+                        
+                        GetNextToken();
+                        O_CODE_ALIGN = ParseExpression();
+                        StrToUpper(token);
+                        if (O_CODE_ALIGN == 0) {
+                            snprintf(errmsg, sizeof(errmsg), "Alignment of 0 not allowed");
+                            ProcessError(errmsg);
+                            SkipToEOL();
+                            return;
                         }
-                        AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
-                        switch (DirType) {
+                        O_DATA_ALIGN = O_CODE_ALIGN;        // default data aligment follows code alignment
+                        if ((O_CODE_ADDR % O_CODE_ALIGN) != 0) {
+                            snprintf(errmsg, sizeof(errmsg), "Address %x not aligned by %x", O_CODE_ADDR, O_CODE_ALIGN);
+                            ProcessError(errmsg);
+                            SkipToEOL();
+                            return;
+                        }
+                    }
+                    else if (strcmp(token, "ENTRY") == 0) {
+                        if (O_ENTRY_SET == FALSE) {
+                            O_ENTRY_SET = TRUE;
+                        }
+                        else {
+                            snprintf(errmsg, sizeof(errmsg), "Entry point already set");
+                            ProcessError(errmsg);
+                            SkipToEOL();
+                            return;
+                        }
+                        GetNextToken();
+                    }
 
-                        case D_DOUBLE:
-                            if ((dataAdr % 8) == 0) {
-                                dataAdr = (dataAdr  + 8);
-                            }
-                            break;
+                    else {
+                        snprintf(errmsg, sizeof(errmsg), "Invalid Parameter %s", token);
+                        ProcessError(errmsg);
+                        SkipToEOL();
+                        return;
+                    }
+                    if (tokTyp == T_COMMA) {
+                        GetNextToken();
+                        StrToUpper(token);
+                    }
+                } while (tokTyp != T_EOL);
 
-                        case D_WORD:
-                            if ((dataAdr % 4) == 0) {
-                                dataAdr = (dataAdr + 4);
-                            }
-                            break;
+                if (O_ENTRY_SET == TRUE) {
+                    O_ENTRY = O_CODE_ADDR;
+                }
+            }
+            else {
+                snprintf(errmsg, sizeof(errmsg), "invalid %s in Module program", token);
+                ProcessError(errmsg);
+                SkipToEOL();
+                return;
+            }
+            break;
 
-                        case D_HALF:
-                            if ((dataAdr % 2) == 0) {
-                                dataAdr = (dataAdr + 2);
-                            }
-                            else
-                                dataAdr = ((dataAdr / 2) * 2) + 2;
-                            break;
-                        case D_BYTE:
-                            dataAdr = (dataAdr + 1);
-                            break;
+
+        case D_DATA:
+
+            if (prgType == P_STANDALONE) {
+                GetNextToken();
+                StrToUpper(token);
+                do
+                {
+                    if (strcmp(token, "ADDR") == 0) {
+                        GetNextToken();
+                        O_DATA_ADDR = ParseExpression();
+                        StrToUpper(token);
+                    }
+                    else if (strcmp(token, "ALIGN") == 0) {
+
+                        GetNextToken();
+                        O_DATA_ALIGN = ParseExpression();
+                        StrToUpper(token);
+                        if (O_DATA_ALIGN == 0) {
+                            snprintf(errmsg, sizeof(errmsg), "Alignment of 0 not allowed");
+                            ProcessError(errmsg);
+                            SkipToEOL();
+                            return;
+                        }
+                        if ((O_DATA_ADDR % O_DATA_ALIGN) != 0) {
+                            snprintf(errmsg, sizeof(errmsg), "Address %x not aligned by %x", O_DATA_ADDR, O_DATA_ALIGN);
+                            ProcessError(errmsg);
+                            SkipToEOL();
+                            return;
                         }
                     }
                     else {
-                        snprintf(errmsg, sizeof(errmsg), "Directive %s:\t .%s not allowed outside module or function", label,tokenSave);
+                        snprintf(errmsg, sizeof(errmsg), "Invalid Parameter %s", token);
                         ProcessError(errmsg);
                         SkipToEOL();
                         return;
                     }
-                    if (currentScopeLevel == SCOPE_FUNCTION) {
-
+                    if (tokTyp == T_COMMA) {
+                        GetNextToken();
+                        StrToUpper(token);
                     }
-                    break;
-                }
-                strcpy(label, "");
+                } while (tokTyp != T_EOL);
             }
             else {
-
-                snprintf(errmsg, sizeof(errmsg), "Symbol %s already defined in this scope", label);
+                snprintf(errmsg, sizeof(errmsg), "invalid %s in Module program", token);
                 ProcessError(errmsg);
-                strcpy(label, "");
                 SkipToEOL();
                 return;
             }
-        }
-    }
-    VarType = V_VALUE;
+            break;
 
+        case D_ALIGN:
+
+            GetNextToken();
+            align = atoi(token);
+            GetNextToken();
+            StrToUpper(token);
+            if (strcmp(token,"K") == 0) {
+                align = align * 1024;
+            }
+            dataAdr = ((dataAdr / align) * align) + align;
+            if ((align % 2) != 0) {
+
+            }
+
+            break;
+
+
+
+
+        case D_BYTE:
+
+            if ((currentScopeLevel == SCOPE_MODULE) || (currentScopeLevel == SCOPE_PROGRAM)) {
+                VarType = V_MEMGLOBAL;
+            }
+            if (currentScopeLevel == SCOPE_FUNCTION) {
+                VarType = V_MEMLOCAL;
+            }
+            GetNextToken();
+
+            // Check if negative value
+
+            is_negative = FALSE;
+            if (tokTyp == T_MINUS) {
+
+                is_negative = TRUE;
+                GetNextToken();
+            }
+
+            // expression calculation 
+            value = ParseExpression();
+            strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
+
+
+            // Write in SYMTAB
+            AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+
+            // Write in DATA SECTION of ELF File in BIG Endian format
+            p_data[0 + O_dataOfs] = value & 0xFF;
+            O_dataOfs = O_dataOfs + 1;
+
+            // TODO: check ob OdataOfs nahe p_dataSize
+            //-----------------------
+
+            // adjust data address
+            if ((dataAdr % 1) == 0) {
+                dataAdr = (dataAdr + 1);
+            }
+            break;
+
+
+        case D_HALF:
+
+            if ((currentScopeLevel == SCOPE_MODULE) || (currentScopeLevel == SCOPE_PROGRAM)) {
+                VarType = V_MEMGLOBAL;
+            }
+            if (currentScopeLevel == SCOPE_FUNCTION) {
+                VarType = V_MEMLOCAL;
+            }
+            GetNextToken();
+
+            // Check if negative value
+
+            is_negative = FALSE;
+            if (tokTyp == T_MINUS) {
+
+                is_negative = TRUE;
+                GetNextToken();
+            }
+
+            // expression calculation 
+            value = ParseExpression();
+            strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
+
+            // Align on half word boundary
+            if ((dataAdr % 2) != 0) {
+                dataAdr = ((dataAdr / 2) * 2) + 2;
+            }
+
+            // Write in SYMTAB
+            AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+
+            // Write in DATA SECTION of ELF File in BIG Endian format
+            p_data[0 + O_dataOfs] = (value >> 8) & 0xFF;
+            p_data[1 + O_dataOfs] = value & 0xFF;
+            O_dataOfs = O_dataOfs + 2;
+
+            // TODO: check ob OdataOfs nahe p_dataSize
+            //-----------------------
+
+            // adjust data address
+            if ((dataAdr % 2) == 0) {
+                dataAdr = (dataAdr + 2);
+            }
+            break;
+
+        case D_WORD:
+
+            if ((currentScopeLevel == SCOPE_MODULE) || (currentScopeLevel == SCOPE_PROGRAM)) {
+                VarType = V_MEMGLOBAL;
+            }
+            if (currentScopeLevel == SCOPE_FUNCTION) {
+                VarType = V_MEMLOCAL;
+            }
+            GetNextToken();
+
+            // Check if negative value
+    
+            is_negative = FALSE;
+            if (tokTyp == T_MINUS) {
+
+                is_negative = TRUE;
+                GetNextToken();
+            }
+    
+            // expression calculation 
+            value = ParseExpression();
+            strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
+
+            // Align on word boundary
+            if ((dataAdr % 4) != 0) {
+                dataAdr = ((dataAdr / 4) * 4) + 4;
+            }
+
+            // Write in SYMTAB
+            AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+
+            // Write in DATA SECTION of ELF File in BIG Endian format
+            p_data[0+O_dataOfs] = (value >> 24) & 0xFF;
+            p_data[1+O_dataOfs] = (value >> 16) & 0xFF;
+            p_data[2+O_dataOfs] = (value >> 8) & 0xFF;
+            p_data[3+O_dataOfs] = value & 0xFF;
+            O_dataOfs = O_dataOfs + 4;
+
+            // TODO: check ob OdataOfs nahe p_dataSize
+            //-----------------------
+
+            // adjust data address
+            if ((dataAdr % 4) == 0) {
+                dataAdr = (dataAdr + 4);
+            }
+            break;
+
+        case D_DOUBLE:
+
+            if ((currentScopeLevel == SCOPE_MODULE) || (currentScopeLevel == SCOPE_PROGRAM)) {
+                VarType = V_MEMGLOBAL;
+            }
+            if (currentScopeLevel == SCOPE_FUNCTION) {
+                VarType = V_MEMLOCAL;
+            }
+            GetNextToken();
+
+            // Check if negative value
+
+            is_negative = FALSE;
+            if (tokTyp == T_MINUS) {
+
+                is_negative = TRUE;
+                GetNextToken();
+            }
+
+            // expression calculation 
+            value = ParseExpression();
+            strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
+
+            // Align on word boundary
+            if ((dataAdr % 8) != 0) {
+                dataAdr = ((dataAdr / 8) * 8) + 8;
+            }
+
+            // Write in SYMTAB
+            AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+
+            // Write in DATA SECTION of ELF File in BIG Endian format
+            p_data[0 + O_dataOfs] = (value >> 56) & 0xFF;
+            p_data[1 + O_dataOfs] = (value >> 48) & 0xFF;
+            p_data[2 + O_dataOfs] = (value >> 40) & 0xFF;
+            p_data[3 + O_dataOfs] = (value >> 32) & 0xFF;
+            p_data[4 + O_dataOfs] = (value >> 24) & 0xFF;
+            p_data[5 + O_dataOfs] = (value >> 16) & 0xFF;
+            p_data[6 + O_dataOfs] = (value >> 8) & 0xFF;
+            p_data[7 + O_dataOfs] = value & 0xFF;
+            O_dataOfs = O_dataOfs + 8;
+
+            // TODO: check ob OdataOfs nahe p_dataSize
+            //-----------------------
+
+            // adjust data address
+            if ((dataAdr % 8) == 0) {
+                dataAdr = (dataAdr + 8);
+            }
+            break;
+
+        case D_STRING:
+
+            // string startet immer mit " und alle Zeichen bis zm nächsten " gehören zum string
+
+            strcpy(tokenSave,"");
+            GetNextToken();
+            GetNextToken(); // get first token in STRING
+
+            while (tokTyp != T_QUOT) {      // exit if closing quote
+  
+                strcat(tokenSave, token);
+                GetNextToken();
+            } 
+            
+            strcpy(token, tokenSave);
+  
+            memcpy(p_data + O_dataOfs, token, strlen(token) + 1) ;
+            O_dataOfs = O_dataOfs + strlen(token) + 1;
+            break;
+
+        } // end switch
+        strcpy(label, "");
+        VarType = V_VALUE;
+
+    } // end directive found
 }

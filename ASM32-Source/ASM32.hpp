@@ -10,13 +10,15 @@ extern FILE* inputFile;                      // The .s input file
 extern int         lineNr;                     // line number source file
 extern int         column;                         // column of token in sourceline
 extern char        sl[MAX_LINE_LENGTH];            // Line from source file
+extern int         prgType;                        // Programmtyp 0=undefined, 1=standalone mode, 2= Modul mode
 extern char        token[MAX_WORD_LENGTH];         // token value
 extern char        tokenSave[MAX_WORD_LENGTH];     // save previous token
 extern int         tokTyp;                         // type of token see enum
 extern int         tokTyp_old;
 extern int         numToken;                       // numeric value of token
 extern int         mode;
-extern int         value;
+extern int64_t     value;
+extern int         align_val;                      ///< alignemnt value
 extern bool        lineERR;
 
 extern char        label[MAX_WORD_LENGTH];
@@ -49,6 +51,19 @@ extern char        opt2[MAX_WORD_LENGTH];       // option for AST
 
 extern int         codeAdr;                        // adress counter code
 extern int         dataAdr;                        // adress counter data
+extern uint32_t    O_CODE_ADDR;
+extern uint32_t    O_DATA_ADDR;
+extern uint32_t    O_ENTRY;                        ///< Entry Point
+extern bool        O_ENTRY_SET;
+extern uint32_t    O_CODE_ALIGN;
+extern uint32_t    O_DATA_ALIGN;
+
+extern char        O_DATA[2000];
+extern int         O_dataOfs;                      ///< offset in data memory area
+extern char        *p_data;                         ///< pointer data memory area
+extern int         p_dataSize;              ///< size of data area per malloc
+
+
 extern char        func_entry[MAX_WORD_LENGTH];
 extern bool        main_func_detected;
 extern char opchar[5][10];                  
@@ -195,7 +210,7 @@ void InsertMC_SRC(SRCNode* node, int depth);
 // -- utils.cpp
 void    CloseSourceFile();
 void    FatalError(const char* msg);
-int     HexCharToInt(char ch);
+int     isunderline(char ch);
 void    OpenSourceFile();
 void    ProcessError(const char* msg);
 void    PrintDebug(const char* msg);
@@ -219,9 +234,9 @@ void    ParseInstruction();
 void    ParseLabel();
 void    ParseModInstr();
 void    SkipToEOL();
-int     ParseExpression();
-int     ParseTerm();
-int     ParseFactor();
+int64_t      ParseExpression();
+int64_t      ParseTerm();
+int64_t      ParseFactor();
 void    AddDirective(SYM_ScopeType type, char* label, char* func, const char* value, int linenr);
 void    AddScope(SYM_ScopeType type, char* label, char* func, const char* value, int linenr);
 void    Add_SYMchild(SymNode* parent, SymNode* child);
@@ -243,6 +258,10 @@ void SetBit(int pos, int x, int num);
 void SetOffset(int pos, int x, int num);
 void SetGenRegister(int reg, char* regname);
 void WriteBinary();
+
+// -- ELF writer
+int WriteELF();
+
 
 
 #endif

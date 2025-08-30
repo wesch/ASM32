@@ -88,24 +88,15 @@ void PrintDebug(const char* msg) {
 }
 
 // --------------------------------------------------------------------------------
-//      hexCharToInt (char)  --> int
-//
-//      This function is passed a character. If it is a hex digit, i.e.,
-//          0, 1, 2, ... 9, a, b, ... f, A, B, ... F
-//          then it returns its value (0..15).  Otherwise, it returns -1.
+// isunderline similar to isdigit
 // --------------------------------------------------------------------------------
-int HexCharToInt(char ch) {
 
-    if (('0' <= ch) && (ch <= '9')) {
-        return ch - '0';
-    }
-    else if (('a' <= ch) && (ch <= 'f')) {
-        return ch - 'a' + 10;
-    }
-    else if (('A' <= ch) && (ch <= 'F')) {
-        return ch - 'A' + 10;
-    }
+int isunderline(char ch) {
+
+    if (ch == '_') {
+        return 1;
+        }
     else {
-        return -1;
+        return 0;
     }
 }

@@ -1,39 +1,26 @@
 ; ======================================
-; Example program ASM32
+; Example program ASM32 Bootstrap Mode
 ; ======================================
+;  Global area
+; ======================================                  
 
-; KSO:		.GLOBAL		adr=0x1000_0000
+                    .GLOBAL 
+                    .CODE align=0x0000_1000,entry,addr=0x0000_3000
+                    .DATA addr=0x0000_4000,align=0x000_2000
 
-;			.ENDGLOBAL
+                    .ALIGN 4k
 
-IVA:		.MODULE		
-W1:			.WORD		
-W2:			.WORD
-H1:			.HALF
+S_1:                 .STRING "HALLO"
+Word_01:             .WORD 0x0123_4567
+S2:                 .STRING "ASSEMBLER-ASM32"
+B1:                 .BYTE 0x01
+H1:                 .HALF 0x0123
+D1:                 .DOUBLE 0x0123_4567_89ab_cdef
 
-			.IMPORT	UTIL
+AB_C1:
+                    ADCH    R1,R2(R3)
+                    ADC.L   R1,-47
+                    ADC.O   R1,R2,W1
 
-MAIN:		.FUNCTION	
-			ADCH	R1,R2(R3)
-			ADC.L	R1,-47
-			ADC.O	R1,R2,W1
-			B	FUNC1, RL
-			.ENDFUNCTION
-
-INIT:		.FUNCTION
-			.ENDFUNCTION
-			.ENDMODULE
-
-UTIL:		.MODULE
-
-			.EXPORT	FUNC1
-FUNC1:		.FUNCTION
-
-STATUS:		.WORD		
-
-			LD	RL, -8(SP)
-			BV	(RL) 
-			.ENDFUNCTION
-
-			.ENDMODULE
-			.ENDPROGRAM
+                    ADC.L   R2,-47                                      
+                    .END

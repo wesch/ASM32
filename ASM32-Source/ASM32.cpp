@@ -21,12 +21,14 @@
 int         lineNr = 0;                     ///< line number source file
 int         column;                         ///< column of token in sourceline
 char        sl[MAX_LINE_LENGTH];            ///< Line from source file
+int         prgType;                        ///< Programmtyp 0=undefined, 1=standalone mode, 2= Modul mode
 char        token[MAX_WORD_LENGTH];         ///< token value
 char        tokenSave[MAX_WORD_LENGTH];     ///< save previous token
 int         tokTyp;                         ///< type of token see enum
 int         tokTyp_old;                     ///< save previous tokTyp
 int         numToken;                       ///< numeric value of token
-int         value;
+int64_t         value;                          ///< numeric value as reult of expression
+int         align_val;                      ///< alignemnt value
 int         mode;                           ///< mode for arithmetic functions
 bool        lineERR;                        ///< Flag actual line is in error
 char        label[MAX_WORD_LENGTH];         ///< actual label
@@ -56,6 +58,18 @@ int         binInstrSave;                    ///< binaer instruction save für gr
 int         codeAdr;                        ///< adress counter code
 int         dataAdr;                        ///< adress counter data
 
+
+uint32_t    O_CODE_ADDR;
+uint32_t    O_DATA_ADDR;
+uint32_t    O_ENTRY;                        ///< Entry Point
+uint32_t    O_CODE_ALIGN;
+uint32_t    O_DATA_ALIGN;
+bool        O_ENTRY_SET = FALSE;            ///< Flag if Entrypoint already set
+
+int         O_dataOfs;                      ///< offset in data memory area
+char        *p_data;                        ///< pointer data memory area
+int         p_dataSize = 4096;              ///< size of data area per malloc
+
 char        func_entry[MAX_WORD_LENGTH];    ///< name of current function
 bool        main_func_detected;
 
@@ -70,7 +84,7 @@ FILE*       inputFile;                      ///< The .s input file
 
 // DEBUG switches
 
-bool DBG_TOKEN = FALSE;
+bool DBG_TOKEN = TRUE;
 bool DBG_PARSER = FALSE;
 bool DBG_GENBIN = FALSE;
 bool DBG_SYMTAB = TRUE;
@@ -146,101 +160,71 @@ SRCNode* SRCcurrent = NULL;
 //      Sub Routines  
 // --------------------------------------------------------------------------------
 
-using namespace ELFIO;
 
-const Elf64_Addr CODE_ADDR = 0x00401000;
-const Elf_Xword  PAGE_SIZE = 0x1000;
-const Elf64_Addr DATA_ADDR = CODE_ADDR + PAGE_SIZE;
 
-int WriteELF() {
-    elfio writer;
 
-    // You can't proceed without this function call!
-    writer.create(ELFCLASS64, ELFDATA2MSB);
 
-    writer.set_os_abi(ELFOSABI_LINUX);
-    writer.set_type(ET_EXEC);
-    writer.set_machine(EM_X86_64);
 
-    // Create text section
-    section* text_sec = writer.sections.add(".text");
-    text_sec->set_type(SHT_PROGBITS);
-    text_sec->set_flags(SHF_ALLOC | SHF_EXECINSTR);
-    text_sec->set_addr_align(0x10);
 
-    // Add data into it
-    char text[] = {
-        '\xB8', '\x04', '\x00', '\x00', '\x00', // mov eax, 4
-        '\xBB', '\x01', '\x00', '\x00', '\x00', // mov ebx, 1
-        '\xB9', '\x00', '\x00', '\x00', '\x00', // mov ecx, msg
-        '\xBA', '\x0E', '\x00', '\x00', '\x00', // mov edx, 14
-        '\xCD', '\x80',                         // int 0x80
-        '\xB8', '\x01', '\x00', '\x00', '\x00', // mov eax, 1
-        '\xCD', '\x80'                          // int 0x80
-    };
-    // Adjust data address for 'msg'
-    *(uint32_t*)(text + 11) = DATA_ADDR;
+void standard_EQU_REG() {
 
-    text_sec->set_data(text, sizeof(text));
+    ///< default register namen
+    strcpy(label, "DP");
+    strcpy(dirCode, "REG");
+    strcpy(token, "R13");
+    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
-    // Create a loadable segment
-    segment* text_seg = writer.segments.add();
-    text_seg->set_type(PT_LOAD);
-    text_seg->set_virtual_address(CODE_ADDR);
-    text_seg->set_physical_address(CODE_ADDR);
-    text_seg->set_flags(PF_X | PF_R);
-    text_seg->set_align(PAGE_SIZE);
+    strcpy(label, "RL");
+    strcpy(dirCode, "REG");
+    strcpy(token, "R14");
+    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
-    // Add text section into program segment
-    text_seg->add_section(text_sec, text_sec->get_addr_align());
+    strcpy(label, "SP");
+    strcpy(dirCode, "REG");
+    strcpy(token, "R15");
+    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
-    // Create data section
-    section* data_sec = writer.sections.add(".data");
-    data_sec->set_type(SHT_PROGBITS);
-    data_sec->set_flags(SHF_ALLOC | SHF_WRITE);
-    data_sec->set_addr_align(0x4);
+    strcpy(label, "ARG0");
+    strcpy(dirCode, "REG");
+    strcpy(token, "R11");
+    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
-    char data[] = {
-        '\x48', '\x65', '\x6C', '\x6C', '\x6F', // msg: db   'Hello, World!', 10
-        '\x2C', '\x20', '\x57', '\x6F', '\x72',
-        '\x6C', '\x64', '\x21', '\x0A' };
-    data_sec->set_data(data, sizeof(data));
+    strcpy(label, "ARG1");
+    strcpy(dirCode, "REG");
+    strcpy(token, "R10");
+    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
-    // Create a read/write segment
-    segment* data_seg = writer.segments.add();
-    data_seg->set_type(PT_LOAD);
-    data_seg->set_virtual_address(DATA_ADDR);
-    data_seg->set_physical_address(DATA_ADDR);
-    data_seg->set_flags(PF_W | PF_R);
-    data_seg->set_align(PAGE_SIZE);
+    strcpy(label, "ARG2");
+    strcpy(dirCode, "REG");
+    strcpy(token, "R9");
+    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
-    // Add data section into program segment
-    data_seg->add_section(data_sec, data_sec->get_addr_align());
+    strcpy(label, "ARG3");
+    strcpy(dirCode, "REG");
+    strcpy(token, "R8");
+    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
-    // Add optional signature for the file producer
-    section* note_sec = writer.sections.add(".note");
-    note_sec->set_type(SHT_NOTE);
-    note_sec->set_addr_align(1);
+    strcpy(label, "RET0");
+    strcpy(dirCode, "REG");
+    strcpy(token, "R11");
+    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
-    note_section_accessor note_writer(writer, note_sec);
-    note_writer.add_note(0x01, "Created by ELFIO", 0, 0);
-    char descr[6] = { 0x31, 0x32, 0x33, 0x34, 0x35, 0x36 };
-    note_writer.add_note(0x01, "Never easier!", descr, sizeof(descr));
+    strcpy(label, "RET1");
+    strcpy(dirCode, "REG");
+    strcpy(token, "R10");
+    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
-    // Setup entry point. Usually, a linker sets this address on base of
-    // ‘_start’ label.
-    // In this example, the code starts at the first address of the
-    // 'text_seg' segment. Therefore, the start address is set
-    // to be equal to the segment location
-    writer.set_entry(text_seg->get_virtual_address());
+    strcpy(label, "RET2");
+    strcpy(dirCode, "REG");
+    strcpy(token, "R9");
+    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
-    // Create ELF file
-    writer.save("hello_x86_64");
-
-    return 0;
+    strcpy(label, "RET3");
+    strcpy(dirCode, "REG");
+    strcpy(token, "R8");
+    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
 }
-
 
 SRCNode* Create_SRCnode(SRC_NodeType type, const char* text, int lineNr) {
     SRCNode* node = (SRCNode*)malloc(sizeof(SRCNode));
@@ -425,6 +409,7 @@ int main(int argc, char** argv) {
 
     lineNr = 1;
     main_func_detected = FALSE;
+    prgType = P_UNDEFINED;        // Programmtyp noch nicht definiert
 
     strcpy(buffer, SourceFileName);
     strcat(buffer, "\n");
@@ -478,85 +463,40 @@ int main(int argc, char** argv) {
     //  reads chained list of tokens and generates Abstarct syntax tree
     // --------------------------------------------------------------------------------
     
+
+    
+
     if (DBG_PARSER) {
         printf("\n\nParser\n");
         printf("----------------------------\n");
     }
     // Globaler Scope
     lineNr = 1;
-    currentScopeLevel = SCOPE_GLOBAL;
+    currentScopeLevel = SCOPE_PROGRAM;
     strcpy(label, "GLOBAL");
     strcpy(symFunc, "");
     strcpy(symValue, "");
-    GlobalSYM = Create_SYMnode(SCOPE_GLOBAL, label, symFunc, symValue, 0);
+    GlobalSYM = Create_SYMnode(SCOPE_PROGRAM, label, symFunc, SourceFileName, 0);
     scopeTab[currentScopeLevel] = GlobalSYM;
 
+
     // ADD Programm P1 Scope
-    strcpy(label, "P1");
-    strcpy(symFunc, "PROGRAM");
-    AddScope(SCOPE_PROGRAM, label, symFunc, SourceFileName, 0);
+//    strcpy(label, "P1");
+//    strcpy(symFunc, "PROGRAM");
+//    AddScope(SCOPE_PROGRAM, label, symFunc, SourceFileName, 0);
 
-    ///< default register namen
-    strcpy(label, "DP");
-    strcpy(dirCode, "REG");
-    strcpy(token, "R13");
-    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
-
-    strcpy(label, "RL");
-    strcpy(dirCode, "REG");
-    strcpy(token, "R14");
-    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
-
-    strcpy(label, "SP");
-    strcpy(dirCode, "REG");
-    strcpy(token, "R15");
-    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
-
-    strcpy(label, "ARG0");
-    strcpy(dirCode, "REG");
-    strcpy(token, "R11");
-    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
-
-    strcpy(label, "ARG1");
-    strcpy(dirCode, "REG");
-    strcpy(token, "R10");
-    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
-
-    strcpy(label, "ARG2");
-    strcpy(dirCode, "REG");
-    strcpy(token, "R9");
-    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
-
-    strcpy(label, "ARG3");
-    strcpy(dirCode, "REG");
-    strcpy(token, "R8");
-    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
-
-    strcpy(label, "RET0");
-    strcpy(dirCode, "REG");
-    strcpy(token, "R11");
-    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
-
-    strcpy(label, "RET1");
-    strcpy(dirCode, "REG");
-    strcpy(token, "R10");
-    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
-
-    strcpy(label, "RET2");
-    strcpy(dirCode, "REG");
-    strcpy(token, "R9");
-    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
-
-    strcpy(label, "RET3");
-    strcpy(dirCode, "REG");
-    strcpy(token, "R8");
-    AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+    standard_EQU_REG();
 
     currentScopeType = SCOPE_PROGRAM;
 
     ptr_t = start_t;
     codeAdr = 0;
     dataAdr = 0;
+
+    // allocate memory area for data
+    p_data = (char *)malloc(p_dataSize);
+    O_dataOfs = 0;
+  
 
     while (ptr_t != NULL) {
 
