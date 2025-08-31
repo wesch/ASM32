@@ -1,0 +1,3 @@
+/Users/helmutfieres/GitHub/ASM32/build/CMakeFiles/ASM32.dir
+/Users/helmutfieres/GitHub/ASM32/build/CMakeFiles/edit_cache.dir
+/Users/helmutfieres/GitHub/ASM32/build/CMakeFiles/rebuild_cache.dir
