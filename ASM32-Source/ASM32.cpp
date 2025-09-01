@@ -59,6 +59,7 @@ int         codeAdr;                        ///< adress counter code
 int         dataAdr;                        ///< adress counter data
 
 
+
 uint32_t    O_CODE_ADDR;
 uint32_t    O_DATA_ADDR;
 uint32_t    O_ENTRY;                        ///< Entry Point
@@ -66,7 +67,11 @@ uint32_t    O_CODE_ALIGN;
 uint32_t    O_DATA_ALIGN;
 bool        O_ENTRY_SET = FALSE;            ///< Flag if Entrypoint already set
 
-int         O_dataOfs;                      ///< offset in data memory area
+char        O_DATA[MAX_WORD_LENGTH];
+char        O_TEXT[MAX_WORD_LENGTH];
+int         O_dataLen;                      ///< offset in data memory area
+bool        O_DataSectionData;              ///< flag if data are already in data section (to disting btw. set and append
+bool        O_TextSectionData;              ///< flag if text is already in text section (to disting btw. set and append
 char        *p_data;                        ///< pointer data memory area
 int         p_dataSize = 4096;              ///< size of data area per malloc
 
@@ -84,13 +89,13 @@ FILE*       inputFile;                      ///< The .s input file
 
 // DEBUG switches
 
-bool DBG_TOKEN = TRUE;
+bool DBG_TOKEN = FALSE;
 bool DBG_PARSER = FALSE;
 bool DBG_GENBIN = FALSE;
 bool DBG_SYMTAB = TRUE;
-bool DBG_AST = TRUE;
+bool DBG_AST = FALSE;
 bool DBG_SOURCE = TRUE;
-bool DBG_DIS = FALSE;
+bool DBG_DIS = TRUE;
 
 // --------------------------------------------------------------------------------
 //      token list
@@ -333,12 +338,6 @@ void PrintSRC(SRCNode* node, int depth) {
 /// 
 void PrintSRC_DIS(SRCNode* node, int depth) {
 
-    if (DBG_DIS == FALSE) {
-
-        printf("======== SUPPRESSED =========\n");
-        return;
-    }
-
     if (!node) return;
 
     //     printf("type=%d %04x %08x %4d\t%s", node->type, node->codeAdr, node->binInstr, node->linenr, node->text);
@@ -349,12 +348,21 @@ void PrintSRC_DIS(SRCNode* node, int depth) {
         }
         else if (node->type == SRC_SOURCE &&
             node->binstatus == B_BIN) {
-            printf("w disasm (0x%08x) # line %d  %s", node->binInstr, node->linenr,node->text);
-            
+//           printf("w disasm (0x%08x) # line %d  %s", node->binInstr, node->linenr,node->text);
+            O_TEXT[0] = (node->binInstr >> 24) & 0xFF;
+            O_TEXT[1] = (node->binInstr >> 16) & 0xFF;
+            O_TEXT[2] = (node->binInstr >> 8) & 0xFF;
+            O_TEXT[3] = node->binInstr & 0xFF;
+            addTextSectionData();
         }
         else if (node->type == SRC_BIN &&
             node->binstatus == B_BINCHILD) {
-            printf("w disasm (0x%08x) # line %d  %s", node->binInstr, node->linenr, node->text);
+//            printf("w disasm (0x%08x) # line %d  %s", node->binInstr, node->linenr, node->text);
+            O_TEXT[0] = (node->binInstr >> 24) & 0xFF;
+            O_TEXT[1] = (node->binInstr >> 16) & 0xFF;
+            O_TEXT[2] = (node->binInstr >> 8) & 0xFF;
+            O_TEXT[3] = node->binInstr & 0xFF;
+            addTextSectionData();
         }
         else if (node->type == SRC_SOURCE &&
             node->binstatus == B_NOBIN) {
@@ -364,12 +372,6 @@ void PrintSRC_DIS(SRCNode* node, int depth) {
 //            printf("                    I: \t%s", node->text);
         }
     }
-    else {
-        printf("\n\n");
-        printf("  Program: %s", node->text);
-        printf("--------------------------------------------------------------------------------------\n");
-    }
-
 
     for (int i = 0; i < node->child_count; i++) {
         PrintSRC_DIS(node->children[i], depth + 1);
@@ -462,9 +464,16 @@ int main(int argc, char** argv) {
     //  Parser
     //  reads chained list of tokens and generates Abstarct syntax tree
     // --------------------------------------------------------------------------------
-    
 
-    
+    // -------------------------------------------------------------------------------- 
+    //  prepare ELF output
+    // --------------------------------------------------------------------------------
+    createELF();
+    createTextSection();
+    addTextSectionData();
+    createDataSection();
+    O_DataSectionData = FALSE;
+    O_TextSectionData = FALSE;
 
     if (DBG_PARSER) {
         printf("\n\nParser\n");
@@ -493,11 +502,8 @@ int main(int argc, char** argv) {
     codeAdr = 0;
     dataAdr = 0;
 
-    // allocate memory area for data
-    p_data = (char *)malloc(p_dataSize);
-    O_dataOfs = 0;
   
-
+ 
     while (ptr_t != NULL) {
 
         is_label = FALSE;
@@ -601,7 +607,17 @@ int main(int argc, char** argv) {
 
     CloseSourceFile();
 
-    WriteELF();
+
+    // -------------------------------------------------------------------------------- 
+    //  Finalize ELF output
+    // --------------------------------------------------------------------------------
+
+    createDataSegment();
+    addDataSectionToSegment();
+    createTextSegment();
+    addTextSectionToSegment();
+    addNote();
+    writeElfFile();
 
     exit(0);
 

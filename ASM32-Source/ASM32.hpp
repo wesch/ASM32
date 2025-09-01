@@ -51,6 +51,20 @@ extern char        opt2[MAX_WORD_LENGTH];       // option for AST
 
 extern int         codeAdr;                        // adress counter code
 extern int         dataAdr;                        // adress counter data
+
+
+
+// ELF Format output
+
+using namespace ELFIO;
+// extern elfio writer;
+extern section* text_sec;
+extern segment* text_seg;
+extern section* data_sec;
+extern segment* data_seg;
+extern section* note_sec;
+
+
 extern uint32_t    O_CODE_ADDR;
 extern uint32_t    O_DATA_ADDR;
 extern uint32_t    O_ENTRY;                        ///< Entry Point
@@ -58,8 +72,11 @@ extern bool        O_ENTRY_SET;
 extern uint32_t    O_CODE_ALIGN;
 extern uint32_t    O_DATA_ALIGN;
 
-extern char        O_DATA[2000];
-extern int         O_dataOfs;                      ///< offset in data memory area
+extern char        O_DATA[MAX_WORD_LENGTH];
+extern char        O_TEXT[MAX_WORD_LENGTH];
+extern int         O_dataLen;                      ///< offset in data memory area
+extern bool        O_DataSectionData;
+extern bool        O_TextSectionData;
 extern char        *p_data;                         ///< pointer data memory area
 extern int         p_dataSize;              ///< size of data area per malloc
 
@@ -260,7 +277,18 @@ void SetGenRegister(int reg, char* regname);
 void WriteBinary();
 
 // -- ELF writer
-int WriteELF();
+int createELF();
+int createTextSection();
+int addTextSectionData();
+int createTextSegment();
+int addTextSectionToSegment();
+int createDataSection();
+int addDataSectionData();
+int createDataSegment();
+int addDataSectionToSegment();
+int addNote();
+int writeElfFile();
+
 
 
 

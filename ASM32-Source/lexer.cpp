@@ -48,7 +48,9 @@ void NewTokenList() {
 void PrintTokenList() {
 
     printf("\nToken List\n");
-    printf("----------------------------\n");
+    printf("---------------------------------------------\n");
+    printf("Line#\tcol\tToktyp\tToken\n");
+    printf("---------------------------------------------\n");
 
     if (DBG_TOKEN == FALSE) {
 
@@ -62,9 +64,9 @@ void PrintTokenList() {
 
     while (ptr_t != NULL) {
 
-        printf("%d\t%d\t%s\t", ptr_t->lineNumber, ptr_t->column, ptr_t->token);
+        printf("%d\t%d\t", ptr_t->lineNumber, ptr_t->column);
         PrintTokenCode(ptr_t->tokTyp);
-        printf("\n");
+        printf("\t%s\n", ptr_t->token);
         ptr_t = ptr_t->next;
     }
 }
@@ -112,8 +114,20 @@ void GetToken() {
         }
 
         else if (ch == '"') {
-            tokTyp = T_QUOT;
-            strcpy(token, "\"");
+            column = ind;
+            tokTyp = T_IDENTIFIER;
+            ind++;
+            ch = sl[ind];
+            while (ch != '"') {
+
+                token[j] = ch;
+                j++;
+                ind++;
+                ch = sl[ind];
+            }
+            token[j] = '\0';
+            ind++;
+            tokTyp = T_EOL;             // after string nothing else in line
             break;
         }
 
