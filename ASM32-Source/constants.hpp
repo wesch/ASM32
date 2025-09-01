@@ -22,7 +22,7 @@
 #define FALSE 0
 
 
-#define VERSION "A.00.1.05"
+#define VERSION "A.00.1.08"
 
 
 /* Adressen */
@@ -215,10 +215,12 @@ typedef enum {
 typedef enum {
     D_ALIGN,
     D_BEGIN,
+    D_BUFFER,
     D_BYTE,
     D_CODE,
     D_DATA,
     D_EQU,
+    D_END,
     D_HALF,
     D_IMPORT,
     D_EXPORT,
@@ -246,10 +248,12 @@ const struct directInfo {
 
     { "ALIGN" ,         D_ALIGN },
     { "BEGIN" ,         D_BEGIN },
+    { "BUFFER",         D_BUFFER },
     { "BYTE",           D_BYTE },
     { "CODE",           D_CODE },
     { "DATA" ,          D_DATA },
     { "EQU" ,           D_EQU },
+    { "END" ,           D_END },
     { "HALF" ,          D_HALF },
     { "EXPORT" ,        D_EXPORT},
     { "IMPORT" ,        D_IMPORT},

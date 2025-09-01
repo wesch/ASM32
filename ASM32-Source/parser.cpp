@@ -722,7 +722,7 @@ void PrintTokenCode(int i) {
     switch (i) {
 
     case NONE:          printf("NONE"); break;
-    case T_IDENTIFIER:  printf("IDENTIFIER"); break;
+    case T_IDENTIFIER:  printf("%.10s","IDENTIFIER"); break;
     case T_NUM:         printf("NUM"); break;
     case T_COMMA:       printf("COMMA"); break;
     case T_COLON:       printf("COLON"); break;
@@ -744,7 +744,7 @@ void PrintTokenCode(int i) {
     case T_OR:          printf("OR"); break;
     case T_AND:         printf("AND"); break;
     case T_XOR:         printf("XOR"); break;
-    case T_EOL:		    printf("EOL"); break;
+    case T_EOL:		    printf("%.10s", "EOL"); break;
     case EOF:		    printf("EOF"); break;
 
     default:		    printf("-----  unknown symbol  -----");
@@ -830,7 +830,7 @@ void ParseADDIL_LDIL() {
     if (VarType == V_VALUE) {
 
         if (DBG_PARSER) {
-            printf("[%d]", value);
+            printf("[%" PRId64 "]", value);
         }
         operandType = OT_VALUE;
         ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
@@ -1212,7 +1212,7 @@ void ParseBE() {
     if (VarType == V_VALUE) {
 
         if (DBG_PARSER) {
-            printf("[%d]", value);
+            printf("[%" PRId64 "]", value);
         }
         operandType = OT_VALUE;
         ASTop1 = Create_ASTnode(NODE_OPERAND, ">", value);
@@ -1576,7 +1576,7 @@ void ParseMST() {
         if (VarType == V_VALUE) {
 
             if (DBG_PARSER) {
-                printf("[%d]", value);
+                printf("[%" PRId64 "]", value);
             }
             operandType = OT_VALUE;
             ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
@@ -2246,7 +2246,7 @@ void ParseLDR_STC() {
     if (VarType == V_VALUE) {
 
         if (DBG_PARSER) {
-            printf("[%d]", value);
+            printf("[%" PRId64 "]", value);
         }
         operandType = OT_VALUE;
         ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
@@ -2373,7 +2373,7 @@ void ParseLDO() {
     if (VarType == V_VALUE) {
 
         if (DBG_PARSER) {
-            printf("[%d]", value);
+            printf("[%" PRId64 "]", value);
         }
         operandType = OT_VALUE;
         ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
@@ -2809,7 +2809,7 @@ void ParseLD_ST() {
         if (VarType == V_VALUE) {
 
             if (DBG_PARSER) {
-                printf("[%d]", value);
+                printf("[%" PRId64 "]", value);
             }
             operandType = OT_VALUE;
             ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
@@ -3035,7 +3035,7 @@ void ParseLDA_STA() {
 ///  HE(b >= 0, Unsigned)
 
 void ParseCMR() {
-    char        option[MAX_WORD_LENGTH];        // option value 
+
 
     // check for option
 
@@ -3727,7 +3727,7 @@ void ParseModInstr() {
         if (VarType == V_VALUE) {
 
             if (DBG_PARSER) {
-                printf("[%d]", value);
+                printf("[%" PRId64 "]", value);
             }
             operandType = OT_VALUE;
             ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
@@ -4089,6 +4089,12 @@ void ParseDirective() {
 
     int i = 0;
     int align;
+
+    const char* ptr = O_DATA;
+
+    int buf_size;
+    int buf_init;
+
     VarType = V_VALUE;
 
     strcpy(dirCode, tokenSave);
@@ -4291,8 +4297,78 @@ void ParseDirective() {
 
             break;
 
+        case D_EQU:
+        case D_REG:
+
+            GetNextToken();
+            if (CheckReservedWord()) {
+
+                AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+            }
+            else
+            {
+                snprintf(errmsg, sizeof(errmsg), "Symbol %s is a reserved word", label);
+                ProcessError(errmsg);
+                SkipToEOL();
+                return;
+            }
+            break;
 
 
+        case D_BUFFER:
+            GetNextToken();
+            StrToUpper(token);
+            do
+            {
+                if (strcmp(token, "SIZE") == 0) {
+                    GetNextToken();
+                    buf_size = ParseExpression();
+                    StrToUpper(token);
+                }
+                else if (strcmp(token, "INIT") == 0) {
+
+                    GetNextToken();
+                    buf_init = ParseExpression();
+                    StrToUpper(token);
+                }
+                else {
+                    snprintf(errmsg, sizeof(errmsg), "Invalid Parameter %s", token);
+                    ProcessError(errmsg);
+                    SkipToEOL();
+                    return;
+                }
+                if (tokTyp == T_COMMA) {
+                    GetNextToken();
+                    StrToUpper(token);
+                }
+            } while (tokTyp != T_EOL);
+
+            // Write in SYMTAB
+            AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+
+
+
+            // allocate memory area for data
+            p_data = (char*)malloc(buf_size);
+            O_dataLen = 0;
+
+            /// init data buffer
+            
+            do
+            {
+                p_data[0 + O_dataLen] = buf_init & 0xFF;
+                O_dataLen++;
+                buf_size--;
+            } while (buf_size > 0);
+            
+            memcpy(O_DATA, p_data, O_dataLen);
+
+            addDataSectionData();
+
+            break;
+
+        case D_END:
+            break;
 
         case D_BYTE:
 
@@ -4322,11 +4398,10 @@ void ParseDirective() {
             AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
             // Write in DATA SECTION of ELF File in BIG Endian format
-            p_data[0 + O_dataOfs] = value & 0xFF;
-            O_dataOfs = O_dataOfs + 1;
+            O_DATA[0] = value & 0xFF;
+            O_dataLen = 1;
 
-            // TODO: check ob OdataOfs nahe p_dataSize
-            //-----------------------
+            addDataSectionData();
 
             // adjust data address
             if ((dataAdr % 1) == 0) {
@@ -4367,12 +4442,11 @@ void ParseDirective() {
             AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
             // Write in DATA SECTION of ELF File in BIG Endian format
-            p_data[0 + O_dataOfs] = (value >> 8) & 0xFF;
-            p_data[1 + O_dataOfs] = value & 0xFF;
-            O_dataOfs = O_dataOfs + 2;
+            O_DATA[0] = (value >> 8) & 0xFF;
+            O_DATA[1] = value & 0xFF;
+            O_dataLen = 2;
 
-            // TODO: check ob OdataOfs nahe p_dataSize
-            //-----------------------
+            addDataSectionData();
 
             // adjust data address
             if ((dataAdr % 2) == 0) {
@@ -4412,14 +4486,14 @@ void ParseDirective() {
             AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
             // Write in DATA SECTION of ELF File in BIG Endian format
-            p_data[0+O_dataOfs] = (value >> 24) & 0xFF;
-            p_data[1+O_dataOfs] = (value >> 16) & 0xFF;
-            p_data[2+O_dataOfs] = (value >> 8) & 0xFF;
-            p_data[3+O_dataOfs] = value & 0xFF;
-            O_dataOfs = O_dataOfs + 4;
 
-            // TODO: check ob OdataOfs nahe p_dataSize
-            //-----------------------
+            O_DATA[0] = (value >> 24) & 0xFF;
+            O_DATA[1] = (value >> 16) & 0xFF;
+            O_DATA[2] = (value >> 8) & 0xFF;
+            O_DATA[3] = value & 0xFF;
+            O_dataLen = 4;
+
+            addDataSectionData();
 
             // adjust data address
             if ((dataAdr % 4) == 0) {
@@ -4459,18 +4533,18 @@ void ParseDirective() {
             AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
             // Write in DATA SECTION of ELF File in BIG Endian format
-            p_data[0 + O_dataOfs] = (value >> 56) & 0xFF;
-            p_data[1 + O_dataOfs] = (value >> 48) & 0xFF;
-            p_data[2 + O_dataOfs] = (value >> 40) & 0xFF;
-            p_data[3 + O_dataOfs] = (value >> 32) & 0xFF;
-            p_data[4 + O_dataOfs] = (value >> 24) & 0xFF;
-            p_data[5 + O_dataOfs] = (value >> 16) & 0xFF;
-            p_data[6 + O_dataOfs] = (value >> 8) & 0xFF;
-            p_data[7 + O_dataOfs] = value & 0xFF;
-            O_dataOfs = O_dataOfs + 8;
 
-            // TODO: check ob OdataOfs nahe p_dataSize
-            //-----------------------
+            O_DATA[0] = (value >> 56) & 0xFF;
+            O_DATA[1] = (value >> 48) & 0xFF;
+            O_DATA[2] = (value >> 40) & 0xFF;
+            O_DATA[3] = (value >> 32) & 0xFF;
+            O_DATA[4] = (value >> 24) & 0xFF;
+            O_DATA[5] = (value >> 16) & 0xFF;
+            O_DATA[6] = (value >> 8) & 0xFF;
+            O_DATA[7] = value & 0xFF;
+            O_dataLen = 8;
+
+            addDataSectionData();
 
             // adjust data address
             if ((dataAdr % 8) == 0) {
@@ -4479,23 +4553,17 @@ void ParseDirective() {
             break;
 
         case D_STRING:
-
-            // string startet immer mit " und alle Zeichen bis zm nächsten " gehören zum string
-
-            strcpy(tokenSave,"");
-            GetNextToken();
-            GetNextToken(); // get first token in STRING
-
-            while (tokTyp != T_QUOT) {      // exit if closing quote
-  
-                strcat(tokenSave, token);
-                GetNextToken();
-            } 
             
-            strcpy(token, tokenSave);
-  
-            memcpy(p_data + O_dataOfs, token, strlen(token) + 1) ;
-            O_dataOfs = O_dataOfs + strlen(token) + 1;
+            GetNextToken();
+
+            // Write in SYMTAB
+            AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+
+            strcpy(O_DATA,token) ;
+            O_dataLen = strlen(token) + 1;
+            
+            addDataSectionData();
+
             break;
 
         } // end switch
