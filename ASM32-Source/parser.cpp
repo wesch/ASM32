@@ -572,7 +572,7 @@ int64_t  ParseFactor() {
             }
             else if (VarType == V_MEMGLOBAL) {
                 ///< ??? CHeck 
-                /// werden HALF und BYTE auch je in enem Wort  als Parameter ï¿½bergeben?
+                /// werden HALF und BYTE auch je in enem Wort  als Parameter übergeben?
                 
                 n = dataAdr;
             }
@@ -665,7 +665,7 @@ int64_t  ParseExpression() {
     }
 }
 
-/// @par Hole nï¿½chstes Token aus der Liste
+/// @par Hole nächstes Token aus der Liste
 /// 
 void GetNextToken() {
     ptr_t = ptr_t->next;
@@ -3184,7 +3184,7 @@ void ParseDEP() {
             ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
             Add_ASTchild(ASTinstruction, ASTopt1);
 
-            for ( j = 0; j < strlen(token); j++) {
+            for (j = 0; j < strlen(token); j++) {
 
                 switch (token[j]) {
 
@@ -4089,7 +4089,7 @@ void ParseDirective() {
 
     int i = 0;
     int align;
-
+    int dataAdrOld;
     const char* ptr = O_DATA;
 
     int buf_size;
@@ -4292,7 +4292,8 @@ void ParseDirective() {
             }
             dataAdr = ((dataAdr / align) * align) + align;
             if ((align % 2) != 0) {
-
+                snprintf(errmsg, sizeof(errmsg), "alignment not a power of 2", token);
+                ProcessWarning(errmsg);
             }
 
             break;
@@ -4343,6 +4344,15 @@ void ParseDirective() {
                 }
             } while (tokTyp != T_EOL);
 
+            // Align on word boundary
+            dataAdrOld = dataAdr;
+            if ((dataAdr % 4) != 0) {
+                dataAdr = ((dataAdr / 4) * 4) + 4;
+            }
+            if ((dataAdrOld - dataAdr) != 0) {
+                strcpy(O_DATA, "\0\0\0\0\0\0\0\0");
+                addDataSectionData(O_DATA, dataAdr - dataAdrOld);
+            }
             // Write in SYMTAB
             AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
@@ -4351,6 +4361,8 @@ void ParseDirective() {
             // allocate memory area for data
             p_data = (char*)malloc(buf_size);
             O_dataLen = 0;
+
+
 
             /// init data buffer
             
@@ -4361,9 +4373,9 @@ void ParseDirective() {
                 buf_size--;
             } while (buf_size > 0);
             
-            memcpy(O_DATA, p_data, O_dataLen);
+            addDataSectionData(p_data, O_dataLen);
 
-            addDataSectionData();
+            dataAdr = (dataAdr + O_dataLen);
 
             break;
 
@@ -4401,7 +4413,7 @@ void ParseDirective() {
             O_DATA[0] = value & 0xFF;
             O_dataLen = 1;
 
-            addDataSectionData();
+            addDataSectionData(O_DATA,O_dataLen);
 
             // adjust data address
             if ((dataAdr % 1) == 0) {
@@ -4434,8 +4446,13 @@ void ParseDirective() {
             strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
 
             // Align on half word boundary
+            dataAdrOld = dataAdr;
             if ((dataAdr % 2) != 0) {
                 dataAdr = ((dataAdr / 2) * 2) + 2;
+            }
+            if ((dataAdrOld - dataAdr) != 0) {
+                strcpy(O_DATA, "\0\0\0\0\0\0\0\0");
+                addDataSectionData(O_DATA, dataAdr - dataAdrOld);
             }
 
             // Write in SYMTAB
@@ -4446,7 +4463,7 @@ void ParseDirective() {
             O_DATA[1] = value & 0xFF;
             O_dataLen = 2;
 
-            addDataSectionData();
+            addDataSectionData(O_DATA, O_dataLen);
 
             // adjust data address
             if ((dataAdr % 2) == 0) {
@@ -4478,8 +4495,13 @@ void ParseDirective() {
             strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
 
             // Align on word boundary
+            dataAdrOld = dataAdr;
             if ((dataAdr % 4) != 0) {
                 dataAdr = ((dataAdr / 4) * 4) + 4;
+            }
+            if ((dataAdrOld - dataAdr) != 0) {
+                strcpy(O_DATA, "\0\0\0\0\0\0\0\0");
+                addDataSectionData(O_DATA, dataAdr - dataAdrOld);
             }
 
             // Write in SYMTAB
@@ -4493,7 +4515,7 @@ void ParseDirective() {
             O_DATA[3] = value & 0xFF;
             O_dataLen = 4;
 
-            addDataSectionData();
+            addDataSectionData(O_DATA, O_dataLen);
 
             // adjust data address
             if ((dataAdr % 4) == 0) {
@@ -4524,9 +4546,14 @@ void ParseDirective() {
             value = ParseExpression();
             strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
 
-            // Align on word boundary
+            // Align on double word boundary
+            dataAdrOld = dataAdr;
             if ((dataAdr % 8) != 0) {
                 dataAdr = ((dataAdr / 8) * 8) + 8;
+            }
+            if ((dataAdrOld - dataAdr) != 0) {
+                strcpy(O_DATA, "\0\0\0\0\0\0\0\0");
+                addDataSectionData(O_DATA, dataAdr - dataAdrOld);
             }
 
             // Write in SYMTAB
@@ -4544,7 +4571,7 @@ void ParseDirective() {
             O_DATA[7] = value & 0xFF;
             O_dataLen = 8;
 
-            addDataSectionData();
+            addDataSectionData(O_DATA, O_dataLen);
 
             // adjust data address
             if ((dataAdr % 8) == 0) {
@@ -4556,13 +4583,26 @@ void ParseDirective() {
             
             GetNextToken();
 
+            // Align on word boundary
+            dataAdrOld = dataAdr;
+            if ((dataAdr % 4) != 0) {
+                dataAdr = ((dataAdr / 4) * 4) + 4;
+            }
+            strcpy(O_DATA, "\0\0\0\0\0\0\0\0");
+            addDataSectionData(O_DATA, dataAdr - dataAdrOld);
+
             // Write in SYMTAB
             AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
             strcpy(O_DATA,token) ;
             O_dataLen = strlen(token) + 1;
+
             
-            addDataSectionData();
+            addDataSectionData(O_DATA, O_dataLen);
+
+            // adjust data address
+            
+            dataAdr = (dataAdr + O_dataLen);
 
             break;
 

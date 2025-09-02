@@ -22,7 +22,7 @@
 #define FALSE 0
 
 
-#define VERSION "A.00.1.08"
+#define VERSION "A.00.1.09"
 
 
 /* Adressen */
@@ -114,6 +114,7 @@ typedef enum {
     SRC_SOURCE,
     SRC_BIN,
     SRC_ERROR,
+    SRC_WARNING,
     SRC_INFO
 } SRC_NodeType;
 

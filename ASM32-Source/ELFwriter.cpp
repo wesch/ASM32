@@ -62,14 +62,14 @@ int createDataSection() {
     return 0;
 }
 
-int addDataSectionData() {
+int addDataSectionData(char* data,int len) {
     if (O_DataSectionData == FALSE) {
-        data_sec->set_data(O_DATA, O_dataLen);
+        data_sec->set_data(data, len);
         O_DataSectionData = TRUE;
     }
     else
     {
-        data_sec->append_data(O_DATA, O_dataLen);
+        data_sec->append_data(data, len);
     }
     return 0;
 }

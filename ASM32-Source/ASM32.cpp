@@ -306,6 +306,9 @@ void PrintSRC(SRCNode* node, int depth) {
         if (node->type == SRC_ERROR) {
             printf("                    E: \t%s", node->text);
         }
+        else         if (node->type == SRC_WARNING) {
+            printf("                    W: \t%s", node->text);
+        }
         else if (node->type == SRC_SOURCE && 
                  node->binstatus == B_BIN) {
             printf(" %04x %08x %4d %s", node->codeAdr, node->binInstr, node->linenr, node->text);

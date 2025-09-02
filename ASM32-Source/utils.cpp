@@ -83,6 +83,24 @@ void ProcessError(const char* msg) {
     Add_SRCchild(SRCcurrent, SRCerror);
 }
 
+
+void ProcessWarning(const char* msg) {
+
+    // printf("E: %s\n", msg);
+
+  
+
+    strcpy(buffer, msg);
+    strcat(buffer, "\n");
+
+    Search_SRC(GlobalSRC, 0);
+
+    bin_status = B_NOBIN;
+    SRCerror = Create_SRCnode(SRC_WARNING, buffer, lineNr);
+
+    Add_SRCchild(SRCcurrent, SRCerror);
+}
+
 void PrintDebug(const char* msg) {
     printf("D: %s\n", msg);
 }
