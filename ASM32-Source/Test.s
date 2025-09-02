@@ -7,7 +7,7 @@
                     .GLOBAL 
                     .CODE entry,addr=0x0000_0000
                     .DATA addr=0x0000_1000,align=0x000_1000
-BUFF:               .BUFFER size=5,init=0x01
+BUFF:               .BUFFER size=255,init=0x99
                    
                     .ALIGN 4k
 

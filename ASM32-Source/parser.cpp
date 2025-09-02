@@ -572,7 +572,7 @@ int64_t  ParseFactor() {
             }
             else if (VarType == V_MEMGLOBAL) {
                 ///< ??? CHeck 
-                /// werden HALF und BYTE auch je in enem Wort  als Parameter übergeben?
+                /// werden HALF und BYTE auch je in enem Wort  als Parameter ï¿½bergeben?
                 
                 n = dataAdr;
             }
@@ -665,7 +665,7 @@ int64_t  ParseExpression() {
     }
 }
 
-/// @par Hole nächstes Token aus der Liste
+/// @par Hole nï¿½chstes Token aus der Liste
 /// 
 void GetNextToken() {
     ptr_t = ptr_t->next;
@@ -3184,7 +3184,7 @@ void ParseDEP() {
             ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
             Add_ASTchild(ASTinstruction, ASTopt1);
 
-            for (j = 0; j < strlen(token); j++) {
+            for ( j = 0; j < strlen(token); j++) {
 
                 switch (token[j]) {
 
