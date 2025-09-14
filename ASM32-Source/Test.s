@@ -5,17 +5,17 @@
 ; ======================================                  
 
                     .GLOBAL 
-                    .CODE entry,addr=0x0000_0000
+                    .CODE entry,addr=0x0000_5000
                     .DATA addr=0x0000_0100,align=0x000_0100
-BUFF:               .BUFFER size=5,init=0x99
+; BUFF:               .BUFFER size=500,init=0x88
                    
 
 StartReg:           .REG    R1
 Foo_Bar:            .EQU    47
 
-S_1:                .STRING "HAL LO"
+; S_1:                .STRING "HAL LO"
 Word_01:            .WORD 0x0123_4567
-S2:                 .STRING "ASSEMBLER   ASM32"
+; S2:                 .STRING "ASSEMBLER   ASM32"
 
 B1:                 .BYTE 0x01
                     .ALIGN 16

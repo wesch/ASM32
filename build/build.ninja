@@ -97,14 +97,14 @@ build CMakeFiles/ASM32.dir/ASM32-Source/parser.cpp.o: CXX_COMPILER__ASM32_unscan
 
 
 #############################################
-# Link the executable ASM32
+# Link the executable /Users/helmutfieres/GitHub/ASM32/bin/ASM32
 
-build ASM32: CXX_EXECUTABLE_LINKER__ASM32_Debug CMakeFiles/ASM32.dir/ASM32-Source/ASM32.cpp.o CMakeFiles/ASM32.dir/ASM32-Source/ELFWriter.cpp.o CMakeFiles/ASM32.dir/ASM32-Source/utils.cpp.o CMakeFiles/ASM32.dir/ASM32-Source/lexer.cpp.o CMakeFiles/ASM32.dir/ASM32-Source/codegen.cpp.o CMakeFiles/ASM32.dir/ASM32-Source/parser.cpp.o
+build /Users/helmutfieres/GitHub/ASM32/bin/ASM32: CXX_EXECUTABLE_LINKER__ASM32_Debug CMakeFiles/ASM32.dir/ASM32-Source/ASM32.cpp.o CMakeFiles/ASM32.dir/ASM32-Source/ELFWriter.cpp.o CMakeFiles/ASM32.dir/ASM32-Source/utils.cpp.o CMakeFiles/ASM32.dir/ASM32-Source/lexer.cpp.o CMakeFiles/ASM32.dir/ASM32-Source/codegen.cpp.o CMakeFiles/ASM32.dir/ASM32-Source/parser.cpp.o
   FLAGS = -g -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk
   OBJECT_DIR = CMakeFiles/ASM32.dir
   POST_BUILD = :
   PRE_LINK = :
-  TARGET_FILE = ASM32
+  TARGET_FILE = /Users/helmutfieres/GitHub/ASM32/bin/ASM32
   TARGET_PDB = ASM32.dbg
 
 
@@ -134,6 +134,8 @@ build rebuild_cache: phony CMakeFiles/rebuild_cache.util
 # =============================================================================
 # Target aliases.
 
+build ASM32: phony /Users/helmutfieres/GitHub/ASM32/bin/ASM32
+
 # =============================================================================
 # Folder targets.
 
@@ -142,7 +144,7 @@ build rebuild_cache: phony CMakeFiles/rebuild_cache.util
 #############################################
 # Folder: /Users/helmutfieres/GitHub/ASM32/build
 
-build all: phony ASM32
+build all: phony /Users/helmutfieres/GitHub/ASM32/bin/ASM32
 
 # =============================================================================
 # Built-in targets
