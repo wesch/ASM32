@@ -1,67 +1,93 @@
-
+﻿
 #include "constants.hpp"
 #include "ASM32.hpp"
 
 /// @file
-/// \brief contains all parser functions 
-/// builds the symbol table and the abstract syntax tree (AST)
+/// \brief Implements all parser functions for ASM32.
+/// 
+/// This file contains routines to:
+/// - Build the abstract syntax tree (AST).
+/// - Manage the symbol table and scope hierarchy.
+/// - Perform symbol lookup and validation.
+/// - Provide semantic checks for opcodes, modes, and registers.
 
-// Function to create a new AST node
-// value is alphnumeric value
-// valnum -> numeric value
-// valtype -> type of value 0=num, 1=alpha
 
-ASTNode* Create_ASTnode(AST_NodeType type, const char* value, int valnum) {
+// =================================================================================
+// AST Node Management
+// =================================================================================
+
+/// \brief Create a new AST node.
+/// \param type The type of AST node (instruction, identifier, literal, etc.).
+/// \param value String value (identifier name, literal, etc.).
+/// \param valnum Numeric value (if applicable).
+/// \return Pointer to the newly allocated ASTNode.
+/// 
+/// Each AST node stores source location, scope, and semantic attributes.
+/// Fatal error if memory allocation fails.
+ASTNode* createASTnode(AST_NodeType type, const char* value, int valnum) {
     ASTNode* node = (ASTNode*)malloc(sizeof(ASTNode));
-    
     if (node == NULL) {
-        FatalError("malloc failed");
+        fatalError("malloc failed");
     }
     strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
     node->type = type;
     node->value = strdup(value);
     node->valnum = valnum;
-    node->linenr = lineNr;
+    node->lineNr = lineNr;
     node->column = column;
     node->scopeLevel = currentScopeLevel;
     node->scopeName = strdup(currentScopeName);
     node->symNodeAdr = scopeTab[currentScopeLevel];
     node->children = NULL;
-    node->codeAdr = codeAdr;    
+    node->codeAdr = codeAdr;
     node->operandType = operandType;
-    node->child_count = 0;
+    node->childCount = 0;
     return node;
 }
 
-// Function to add a child node
-void Add_ASTchild(ASTNode* parent, ASTNode* child) {
-    parent->children = (ASTNode**)realloc(parent->children, sizeof(ASTNode*) * (parent->child_count + 1));
+/// \brief Add a child AST node.
+/// \param parent Parent AST node.
+/// \param child Child AST node to attach.
+/// 
+/// Expands the parent's child list dynamically.
+/// Fatal error if memory reallocation fails.
+void addASTchild(ASTNode* parent, ASTNode* child) {
+    parent->children = (ASTNode**)realloc(parent->children, sizeof(ASTNode*) * (parent->childCount + 1));
     if (parent->children == NULL) {
-        FatalError("realloc failed");
+        fatalError("realloc failed");
     }
-    parent->children[parent->child_count++] = child;
+    parent->children[parent->childCount++] = child;
 }
 
-// Function to free an AST node
-void Free_ASTnode(ASTNode* node) {
+/// \brief Recursively free an AST node and all its children.
+/// \param node Root of the AST subtree to free.
+void freeASTnode(ASTNode* node) {
     if (node) {
         free(node->value);
-        for (int i = 0; i < node->child_count; i++) {
-            Free_ASTnode(node->children[i]);
+        for (int i = 0; i < node->childCount; i++) {
+            freeASTnode(node->children[i]);
         }
         free(node->children);
         free(node);
     }
 }
 
-// Function to create a new Sym_node
 
-SymNode* Create_SYMnode(SYM_ScopeType type, char* label, char* func, const char* value, int linenr) {
+// =================================================================================
+// Symbol Table Management
+// =================================================================================
 
+/// \brief Create a new symbol table node.
+/// \param type Scope type (program, module, function, directive).
+/// \param label Symbol label.
+/// \param func Function name associated with the symbol.
+/// \param value Symbol value as string.
+/// \param linenr Source line number.
+/// \return Pointer to the new SymNode.
+SymNode* createSYMnode(SYM_ScopeType type, char* label, char* func, const char* value, int linenr) {
     SymNode* node = (SymNode*)malloc(sizeof(SymNode));
-
     if (node == NULL) {
-        FatalError("malloc failed");
+        fatalError("malloc failed");
     }
     node->type = type;
     node->scopeLevel = currentScopeLevel;
@@ -69,30 +95,36 @@ SymNode* Create_SYMnode(SYM_ScopeType type, char* label, char* func, const char*
     strcpy(node->label, label);
     strcpy(node->func, func);
     strcpy(node->value, value);
-    node->vartype = VarType;
-    node->linenr = lineNr;
+    node->varType = varType;
+    node->lineNr = lineNr;
     node->codeAdr = codeAdr;
     node->dataAdr = dataAdr;
     node->children = NULL;
-    node->child_count = 0;
+    node->childCount = 0;
     return node;
 }
 
-// Function to add a child node
-
-void Add_SYMchild(SymNode* parent, SymNode* child) {
-
-    parent->children = (SymNode**)realloc(parent->children, sizeof(SymNode*) * (parent->child_count + 1));
+/// \brief Add a child symbol node to the symbol table.
+/// \param parent Parent symbol node.
+/// \param child Child symbol node to attach.
+/// 
+/// Expands the parent's child list dynamically.
+/// Fatal error if memory reallocation fails.
+void addSYMchild(SymNode* parent, SymNode* child) {
+    parent->children = (SymNode**)realloc(parent->children, sizeof(SymNode*) * (parent->childCount + 1));
     if (parent->children == NULL) {
-        FatalError("realloc failed");
+        fatalError("realloc failed");
     }
-    parent->children[parent->child_count++] = child;
+    parent->children[parent->childCount++] = child;
 }
 
-
-// Add new Scope
-
-void AddScope(SYM_ScopeType type, char* label, char* func, const char* value, int linenr) {
+/// \brief Add a new scope to the symbol table.
+/// \param type Scope type (program, module, function, etc.).
+/// \param label Scope label.
+/// \param func Function name associated with the scope.
+/// \param value Additional value.
+/// \param linenr Line number where scope was defined.
+void addScope(SYM_ScopeType type, char* label, char* func, const char* value, int linenr) {
     currentScopeLevel++;
     if (currentScopeLevel > maxScopeLevel) {
         printf("Too many Scope Levels\n");
@@ -100,27 +132,37 @@ void AddScope(SYM_ScopeType type, char* label, char* func, const char* value, in
     }
     strcpy(currentScopeName, label);
     strcpy(scopeNameTab[currentScopeLevel], currentScopeName);
-    scopeTab[currentScopeLevel] = Create_SYMnode(type, label, func, value, linenr);
-    Add_SYMchild(scopeTab[currentScopeLevel - 1], scopeTab[currentScopeLevel]);
+    scopeTab[currentScopeLevel] = createSYMnode(type, label, func, value, linenr);
+    addSYMchild(scopeTab[currentScopeLevel - 1], scopeTab[currentScopeLevel]);
 }
 
-// Add directive and link to scope
-
-void AddDirective(SYM_ScopeType type, char* label, char* func, const char* value, int linenr) {
-
-    directive = Create_SYMnode(type, label, func, value, linenr);
-    Add_SYMchild(scopeTab[currentScopeLevel], directive);
-
+/// \brief Attach a directive to the current scope.
+/// \param type Directive type.
+/// \param label Directive label.
+/// \param func Directive function.
+/// \param value Directive value.
+/// \param linenr Line number of directive.
+void addDirectiveToScope(SYM_ScopeType type, char* label, char* func, const char* value, int linenr) {
+    directive = createSYMnode(type, label, func, value, linenr);
+    addSYMchild(scopeTab[currentScopeLevel], directive);
 }
 
-// Function search from actual Scopelevel up
-void SearchSymAll(SymNode* node, char* label, int depth) {
 
+// =================================================================================
+// Symbol Lookup
+// =================================================================================
+
+/// \brief Search a symbol recursively from the current scope upward.
+/// \param node Current symbol node.
+/// \param label Symbol label to search for.
+/// \param depth Recursive depth (for traversal).
+/// 
+/// Updates global variables if a match is found.
+void searchSymAll(SymNode* node, char* label, int depth) {
     if (!node) return;
     if (strcmp(node->label, label) == 0 &&
         node->scopeLevel <= searchScopeLevel &&
         strcmp(node->scopeName, currentScopeName) == 0) {
-        //       printf("Val %s Label %s Line %d\n",node->value,label, node->linenr);
         strcpy(symFunc, node->func);
         strcpy(symValue, node->value);
         dataAdr = node->dataAdr;
@@ -128,18 +170,16 @@ void SearchSymAll(SymNode* node, char* label, int depth) {
         symFound = TRUE;
         return;
     }
-    else {
-        for (int i = 0; i < node->child_count; i++) {
-            SearchSymAll(node->children[i], label, depth + 1);
-        }
+    for (int i = 0; i < node->childCount; i++) {
+        searchSymAll(node->children[i], label, depth + 1);
     }
-
 }
 
-// Function search on actual Scopelevel
-
-void SearchSymLevel(SymNode* node, char* label, int depth) {
-
+/// \brief Search for a symbol in the current scope only.
+/// \param node Current symbol node.
+/// \param label Symbol label to search for.
+/// \param depth Recursive depth (for traversal).
+void searchSymLevel(SymNode* node, char* label, int depth) {
     if (!node) return;
     if (strcmp(node->label, label) == 0 &&
         node->scopeLevel == searchScopeLevel &&
@@ -148,23 +188,21 @@ void SearchSymLevel(SymNode* node, char* label, int depth) {
         symFound = TRUE;
         return;
     }
-    else {
-        for (int i = 0; i < node->child_count; i++) {
-            SearchSymLevel(node->children[i], label, depth + 1);
-
-        }
-
+    for (int i = 0; i < node->childCount; i++) {
+        searchSymLevel(node->children[i], label, depth + 1);
     }
 }
 
-// Funktion Symbol Suche in Symboltabelle
-
-bool SearchSymbol(SymNode* node, char* label) {
+/// \brief Search for a symbol in the symbol table, moving up through scopes if needed.
+/// \param node Root of the symbol table.
+/// \param label Symbol label.
+/// \return TRUE if found, FALSE otherwise.
+bool searchSymbol(SymNode* node, char* label) {
     strcpy(currentScopeName, scopeNameTab[searchScopeLevel]);
     symFound = FALSE;
 
     while (symFound == FALSE) {
-        SearchSymAll(scopeTab[searchScopeLevel], label, 0);
+        searchSymAll(scopeTab[searchScopeLevel], label, 0);
         if (symFound == TRUE) {
             return TRUE;
         }
@@ -172,463 +210,329 @@ bool SearchSymbol(SymNode* node, char* label) {
         strcpy(currentScopeName, scopeNameTab[searchScopeLevel]);
         if (searchScopeLevel == 0) break;
     }
-    if (symFound == FALSE) {
-        // printf("Symbol %s not found\n", label);
-    }
-    if (symFound == TRUE) {
-       // printf("Symbol %s Value %s\n", symFunc, symValue);
-    }
     return symFound;
 }
 
-// Function to print the Symtab
-void PrintSYM(SymNode* node, int depth) {
-
-    if (DBG_SYMTAB == FALSE) {
-
-        printf("======== SUPPRESSED =========\n");
-        return;
-    }
-
+/// \brief Print the symbol table hierarchy.
+/// \param node Current symbol node.
+/// \param depth Indentation level for pretty-printing.
+void printSYM(SymNode* node, int depth) {
     if (!node) return;
-
     for (int i = 0; i < depth; i++) {
         printf(" ");
     }
-
-    printf("%s:\t%d\t%04x\t%04x\t%s\t%.5s\t%.5s\t%d\t%d\t%s\n", 
+    printf("%s:\t%d\t%04x\t%04x\t%-8s %-6s\t%.5s\t%d\t%d\t%s\n",
         (node->type == SCOPE_PROGRAM) ? "P" :
         (node->type == SCOPE_MODULE) ? "M" :
         (node->type == SCOPE_FUNCTION) ? "F" :
         (node->type == SCOPE_DIRECT) ? "D" :
-        "Unknown", node->scopeLevel,node->codeAdr, node->dataAdr, node->label, node->func, node->value, node->vartype, node->linenr,node->scopeName);
+        "Unknown", node->scopeLevel, node->codeAdr, node->dataAdr, node->label, node->func, node->value, node->varType, node->lineNr, node->scopeName);
     if (node->type == SCOPE_PROGRAM) {
-        printf("\t\tSource File: %s\n", node->value);
+        printf("-->Source File: %s\n", node->value);
     }
-
-    for (int i = 0; i < node->child_count; i++) {
-        PrintSYM(node->children[i], depth + 1);
+    for (int i = 0; i < node->childCount; i++) {
+        printSYM(node->children[i], depth + 1);
     }
 }
 
 
-void SkipToEOL() {
+// =================================================================================
+// Parsing Utilities
+// =================================================================================
+
+/// \brief Skip tokens until end-of-line.
+/// 
+/// Consumes tokens until a T_EOL token is encountered.
+/// Resets line error flag afterward.
+void skipToEOL() {
     while (tokTyp != T_EOL) {
-        GetNextToken();
+        fetchToken();
     }
     lineERR = FALSE;
 }
 
-// --------------------------------------------------------------------------------
-// Check reserved word
-//  checks if token is a reserved word
-// --------------------------------------------------------------------------------
-
-bool CheckReservedWord() {
+/// \brief Check if the current token is a reserved word.
+/// \return TRUE if not reserved, FALSE if it matches an opcode, directive, or reserved keyword.
+bool checkReservedWord() {
+    strToUpper(label);
 
     // Check Opcodes
-
-    StrToUpper(label);
-
     int num_Opcode = (sizeof(opCodeTab) / sizeof(opCodeTab[0]));
-    int i;
-
-    for (i = 0; i < num_Opcode; i++) {
-
-        if (strcmp(label, opCodeTab[i].mnemonic) == 0) {		// opCode found
-
+    for (int i = 0; i < num_Opcode; i++) {
+        if (strcmp(label, opCodeTab[i].mnemonic) == 0) {
             return FALSE;
         }
     }
 
-    // Check Dirctives
-
+    // Check Directives
     int num_dircode = (sizeof(dirCodeTab) / sizeof(dirCodeTab[0]));
-
-    for (i = 0; i < num_dircode; i++) {
-
-        if (strcmp(label, dirCodeTab[i].directive) == 0) {		// dircode found
-
+    for (int i = 0; i < num_dircode; i++) {
+        if (strcmp(label, dirCodeTab[i].directive) == 0) {
             return FALSE;
         }
-
     }
 
-    // Check other reserved words
-
+    // Check Reserved Words
     int num_resWord = (sizeof(resWordTab) / sizeof(resWordTab[0]));
-
-    for (i = 0; i < num_resWord; i++) {
-
-        if (strcmp(label, resWordTab[i].resWord) == 0) {		// reserved word found
-
+    for (int i = 0; i < num_resWord; i++) {
+        if (strcmp(label, resWordTab[i].resWord) == 0) {
             return FALSE;
         }
-
     }
     return TRUE;
 }
 
-// --------------------------------------------------------------------------------
-// Check OpCode vs. Mode
-// --------------------------------------------------------------------------------
-
-void CheckOpcodeMode() {
+/// \brief Validate opcode against addressing mode.
+/// 
+/// Certain opcodes may not be valid with byte/word/halfword suffixes.
+/// If invalid, an error is reported.
+void checkOpcodeMode() {
     if (strcmp(opCode, "SUB") == 0) {
         return;
     }
     int x = opCode[strlen(opCode) - 1];
     if (mode == 0 || mode == 1) {
-
-
         if (x == 'H' || x == 'W' || x == 'B') {
-            snprintf(errmsg, sizeof(errmsg), "Invalid Opcode %s mode %d combination ", opCode,mode);
-            ProcessError(errmsg);
+            snprintf(errmsg, sizeof(errmsg), "Invalid Opcode %s mode %d combination ", opCode, mode);
+            processError(errmsg);
         }
     }
 }
 
-// --------------------------------------------------------------------------------
-// Check General Register
-//  checks if global token contains a valid general register
-// --------------------------------------------------------------------------------
 
-bool CheckGenReg() {
+// =================================================================================
+// Register Validation
+// =================================================================================
 
-    int reg = 0;                            // register number from checkreg = 0;
-   
-    StrToUpper(token);
-    
-    if ((token[0] == 'R' && token[1] != 'L' )  && (token[0] == 'R' && token[1] != 'E')){
+/// \brief Check if the current token is a valid general-purpose register.
+/// \return TRUE if valid, FALSE otherwise.
+/// 
+/// Recognizes R0–R31, or resolves register aliases from the symbol table.
+bool checkGenReg() {
+    int reg = 0;
+    strToUpper(token);
 
+    if ((token[0] == 'R' && token[1] != 'L') && (token[0] == 'R' && token[1] != 'E')) {
         if (strlen(token) == 3) {
-
             if (isdigit(token[1]) && isdigit(token[2])) {
-
-                reg = ((token[1] - 48) * 10 + token[2] - 48);
+                reg = ((token[1] - '0') * 10 + token[2] - '0');
                 return TRUE;
             }
-            else {
-                return  FALSE;
-            }
-        }
-        else if (strlen(token) == 2) {
-
-            if (isdigit(token[1])) {
-
-                reg = token[1] - 48;
-                return TRUE;
-            }
-            else {
-                return  FALSE;
-            }
-        }
-        else {
-
             return FALSE;
         }
+        else if (strlen(token) == 2) {
+            if (isdigit(token[1])) {
+                reg = token[1] - '0';
+                return TRUE;
+            }
+            return FALSE;
+        }
+        return FALSE;
     }
     else {
         searchScopeLevel = currentScopeLevel;
-
-        if (SearchSymbol(scopeTab[searchScopeLevel], token)) {
+        if (searchSymbol(scopeTab[searchScopeLevel], token)) {
             if (strcmp(symFunc, "REG") == 0) {
-
                 strcpy(token, symValue);
-
-                if (CheckGenReg()) {
-                    return TRUE;
-                }
-                else
-                {
-                    return FALSE;
-                }
+                return checkGenReg();
             }
-            else
-            {
+            else {
                 strcpy(currentScopeName, scopeNameTab[searchScopeLevel]);
                 return FALSE;
             }
         }
-        else
-        {
-            return FALSE;
-        }
+        return FALSE;
     }
 }
 
-// --------------------------------------------------------------------------------
-// Check Segment Register
-//  checks if global token contains a valid Segment register
-// --------------------------------------------------------------------------------
-
-bool CheckSegReg() {
-
-    int reg = 0;                            // register number from checkreg = 0;
-
-    StrToUpper(token);
+/// \brief Check if the current token is a valid segment register.
+/// \return TRUE if valid, FALSE otherwise.
+bool checkSegReg() {
+    int reg = 0;
+    strToUpper(token);
 
     if (token[0] == 'S') {
-
-        if (strlen(token) == 3) {
-
-            if (isdigit(token[1]) && isdigit(token[2])) {
-
-                reg = ((token[1] - 48) * 10 + token[2] - 48);
-                return TRUE;
-            }
-            else {
-                return  FALSE;
-            }
+        if (strlen(token) == 3 && isdigit(token[1]) && isdigit(token[2])) {
+            reg = ((token[1] - '0') * 10 + token[2] - '0');
+            return TRUE;
         }
-        else if (strlen(token) == 2) {
-
-            if (isdigit(token[1])) {
-
-                reg = token[1] - 48;
-                return TRUE;
-            }
-            else {
-                return  FALSE;
-            }
+        else if (strlen(token) == 2 && isdigit(token[1])) {
+            reg = token[1] - '0';
+            return TRUE;
         }
-        else {
-
-            return FALSE;
-        }
+        return FALSE;
     }
     else {
         searchScopeLevel = currentScopeLevel;
-
-        if (SearchSymbol(scopeTab[searchScopeLevel], token)) {
+        if (searchSymbol(scopeTab[searchScopeLevel], token)) {
             if (strcmp(symFunc, "REG") == 0) {
-
                 strcpy(token, symValue);
-
-                if (CheckGenReg()) {
-                    return TRUE;
-                }
-                else
-                {
-                    return FALSE;
-                }
+                return checkGenReg();
             }
-            else
-            {
+            else {
                 strcpy(currentScopeName, scopeNameTab[searchScopeLevel]);
                 return FALSE;
             }
         }
-        else
-        {
-            return FALSE;
-        }
+        return FALSE;
     }
 }
 
-// --------------------------------------------------------------------------------
-// Check Control Register
-//  checks if global token contains a valid Control register
-// --------------------------------------------------------------------------------
-
-bool CheckCtrlReg() {
-
-    int reg = 0;                            // register number from checkreg = 0;
-
-    StrToUpper(token);
+/// \brief Check if the current token is a valid control register.
+/// \return TRUE if valid, FALSE otherwise.
+bool checkCtrlReg() {
+    int reg = 0;
+    strToUpper(token);
 
     if (token[0] == 'C') {
-
-        if (strlen(token) == 3) {
-
-            if (isdigit(token[1]) && isdigit(token[2])) {
-
-                reg = ((token[1] - 48) * 10 + token[2] - 48);
-                return TRUE;
-            }
-            else {
-                return  FALSE;
-            }
+        if (strlen(token) == 3 && isdigit(token[1]) && isdigit(token[2])) {
+            reg = ((token[1] - '0') * 10 + token[2] - '0');
+            return TRUE;
         }
-        else if (strlen(token) == 2) {
-
-            if (isdigit(token[1])) {
-
-                reg = token[1] - 48;
-                return TRUE;
-            }
-            else {
-                return  FALSE;
-            }
+        else if (strlen(token) == 2 && isdigit(token[1])) {
+            reg = token[1] - '0';
+            return TRUE;
         }
-        else {
-
-            return FALSE;
-        }
+        return FALSE;
     }
     else {
         searchScopeLevel = currentScopeLevel;
-
-        if (SearchSymbol(scopeTab[searchScopeLevel], token)) {
+        if (searchSymbol(scopeTab[searchScopeLevel], token)) {
             if (strcmp(symFunc, "REG") == 0) {
-
                 strcpy(token, symValue);
-
-                if (CheckGenReg()) {
-                    return TRUE;
-                }
-                else
-                {
-                    return FALSE;
-                }
+                return checkGenReg();
             }
-            else
-            {
+            else {
                 strcpy(currentScopeName, scopeNameTab[searchScopeLevel]);
                 return FALSE;
             }
         }
-        else
-        {
-            return FALSE;
-        }
+        return FALSE;
     }
 }
 
+//--------------------------------
 
+// ====================================================================================
+//  Expression Parsing and AST Construction
+// ====================================================================================
 
-
-int64_t  ParseFactor() {
-    int64_t  n = 0;
+/// @brief Parse a factor in an expression.
+/// 
+/// This function handles numbers, identifiers, parentheses, and negation.
+/// It may resolve identifiers against the current scope and determine whether
+/// they are constants, global memory, or local memory.
+/// 
+/// @return The computed value of the parsed factor.
+///
+int64_t parseFactor() {
+    int64_t n = 0;
     intmax_t tmp;
-
     char* endptr;
     errno = 0;
 
     if (tokTyp == T_LPAREN) {
-
-        GetNextToken(); 
-        n = ParseExpression(); 
+        fetchToken();
+        n = parseExpression();
 
         if (tokTyp == T_RPAREN) {
-
-            GetNextToken(); 
-            return n; 
+            fetchToken();
+            return n;
         }
     }
     else if (tokTyp == T_NEG) {
-
         n = ~n;
     }
     else {
-        
         if (tokTyp == T_NUM) {
-
             tmp = strtoimax(token, &endptr, 0);
             n = (int64_t)tmp;
         }
         else if (tokTyp == T_IDENTIFIER) {
             searchScopeLevel = currentScopeLevel;
-            if (SearchSymbol(scopeTab[searchScopeLevel], token)) {
-                printf("");
+            if (searchSymbol(scopeTab[searchScopeLevel], token)) {
                 if (strcmp(symFunc, "EQU") == 0) {
-
                     strcpy(token, symValue);
-                    VarType = V_VALUE;
+                    varType = V_VALUE;
                 }
                 else if (strcmp(symFunc, "WORD") == 0 ||
                     strcmp(symFunc, "HALF") == 0 ||
                     strcmp(symFunc, "BYTE") == 0) {
-                    
-                    // depending on module (global) or function (local) level
-                    // global ofs(DP)
-                    // local ofs(SP)
-                    strcpy(Variable, token);
-                    if (currentScopeType == SCOPE_MODULE) {
-
-                        VarType = V_MEMGLOBAL;
-                    }
-                    if (currentScopeType == SCOPE_FUNCTION) {
-
-                        VarType = V_MEMLOCAL;
-                    }
-
+                    // Variables: global (DP) or local (SP) based on scope
+                    strcpy(varName, token);
+                    varType = (currentScopeType == SCOPE_MODULE) ? V_MEMGLOBAL : V_MEMLOCAL;
                 }
                 else {
                     snprintf(errmsg, sizeof(errmsg), "Invalid symbol name %s ", token);
-                    ProcessError(errmsg);
+                    processError(errmsg);
                     return 0;
                 }
             }
-            else
-            {
+            else {
                 snprintf(errmsg, sizeof(errmsg), "Invalid symbol name %s ", token);
-                ProcessError(errmsg);
+                processError(errmsg);
                 return 0;
             }
 
-            if (VarType == V_VALUE) {
+            // Resolve based on type
+            if (varType == V_VALUE) {
                 n = atoll(token);
             }
-            else if (VarType == V_MEMGLOBAL) {
-                ///< ??? CHeck 
-                /// werden HALF und BYTE auch je in enem Wort  als Parameter �bergeben?
-                
+            else if (varType == V_MEMGLOBAL) {
+                // TODO: Confirm HALF and BYTE alignment in memory
                 n = dataAdr;
             }
-            else if (VarType == V_MEMLOCAL) {
-                
+            else if (varType == V_MEMLOCAL) {
+                // Placeholder for local memory handling
             }
         }
-
-        GetNextToken();
+        fetchToken();
     }
-    return n; 
+    return n;
 }
 
-int64_t  ParseTerm() {
-    int64_t  first, second;
-
-    first = ParseFactor(); 
+/// @brief Parse a term in an expression.
+/// 
+/// A term can involve multiplication, division, modulo, or bitwise AND.
+/// 
+/// @return The computed value of the parsed term.
+///
+int64_t parseTerm() {
+    int64_t first = parseFactor();
     if (lineERR) return 0;
+
     for (;;) {
         if (tokTyp == T_MUL) {
-
-            GetNextToken(); 
-            second = ParseFactor(); 
-            first *= second; 
+            fetchToken();
+            first *= parseFactor();
         }
         else if (tokTyp == T_DIV) {
-
-            GetNextToken(); 
-            second = ParseFactor(); 
-            first /= second; 
+            fetchToken();
+            first /= parseFactor();
         }
         else if (tokTyp == T_MOD) {
-
-            GetNextToken(); 
-            second = ParseFactor(); 
-            first %= second; 
+            fetchToken();
+            first %= parseFactor();
         }
         else if (tokTyp == T_AND) {
-
-            GetNextToken();
-            second = ParseExpression();
-            first &= second;
+            fetchToken();
+            first &= parseExpression();
         }
-
         else {
-            return first; 
+            return first;
         }
     }
 }
 
-/// @par Process expression
+/// @brief Parse a full expression.
 /// 
-int64_t  ParseExpression() {
-    int64_t  first, second;
-
-    first = ParseTerm(); 
+/// Expressions can include addition, subtraction, OR, and XOR.  
+/// Handles operator precedence by combining terms appropriately.
+/// 
+/// @return The computed value of the parsed expression.
+///
+int64_t parseExpression() {
+    int64_t first = parseTerm();
     if (lineERR) return 0;
     if (is_negative == TRUE) {
         first = -first;
@@ -636,38 +540,33 @@ int64_t  ParseExpression() {
 
     for (;;) {
         if (tokTyp == T_PLUS) {
-
-            GetNextToken(); 
-            second = ParseTerm(); 
-            first += second; 
+            fetchToken();
+            first += parseTerm();
         }
         else if (tokTyp == T_MINUS) {
-
-            GetNextToken(); 
-            second = ParseTerm(); 
-            first -= second; 
+            fetchToken();
+            first -= parseTerm();
         }
         else if (tokTyp == T_OR) {
-
-            GetNextToken();
-            second = ParseExpression();
-            first |= second;
+            fetchToken();
+            first |= parseExpression();
         }
         else if (tokTyp == T_XOR) {
-
-            GetNextToken();
-            second = ParseExpression();
-            first ^= second;
+            fetchToken();
+            first ^= parseExpression();
         }
         else {
-            return first; 
+            return first;
         }
     }
 }
 
-/// @par Hole n�chstes Token aus der Liste
+/// @brief Advance to the next token in the token stream.
 /// 
-void GetNextToken() {
+/// Updates the global token information (`token`, `tokTyp`, `lineNr`, `column`)
+/// from the linked token list.
+///
+void fetchToken() {
     ptr_t = ptr_t->next;
     strcpy(token, ptr_t->token);
     tokTyp = ptr_t->tokTyp;
@@ -675,54 +574,53 @@ void GetNextToken() {
     column = ptr_t->column;
 }
 
-/// @par Function to print the AST
+/// @brief Print the Abstract Syntax Tree (AST).
 /// 
-void PrintAST(ASTNode* node, int depth) {
-   
-    if (DBG_AST == FALSE) {
-
-        printf("======== SUPPRESSED =========\n");
-        return;
-    }
-
+/// Recursively traverses the AST and prints each node, indented by depth,
+/// including its type, line number, code address, operand type, and scope.
+/// 
+/// @param node  Pointer to the AST node to print.
+/// @param depth Current depth in the tree (used for indentation).
+///
+void printAST(ASTNode* node, int depth) {
     if (!node) return;
 
     for (int i = 0; i < depth; i++) {
         printf(" ");
     }
 
-    value = node->valnum;
-    if (node->type == NODE_INSTRUCTION) {
-        value = 0;
-    }
+    value = (node->type == NODE_INSTRUCTION) ? 0 : node->valnum;
 
-    printf("%s:\t%4d\t%04x %1d   %.6s\t%4d\t%d\t%s\n", 
-        (node->type == NODE_PROGRAM) ?     "Prg" :
+    printf("%s:\t%4d\t%04x %1d   %.6s\t%4d\t%d\t%s\n",
+        (node->type == NODE_PROGRAM) ? "Prg" :
         (node->type == NODE_INSTRUCTION) ? "Ins" :
-        (node->type == NODE_DIRECTIVE) ?   "Dir" :
-        (node->type == NODE_OPERATION) ?   "OpC" :
-        (node->type == NODE_OPERAND) ?     "Op " :
-        (node->type == NODE_OPTION) ?      "Opt" :
-        (node->type == NODE_MODE) ?        "Mod" :
-        (node->type == NODE_LABEL) ?       "Lab" :
-        "Unknown", node->linenr,node->codeAdr,node->operandType,node->value, value, node->scopeLevel,node->scopeName);
+        (node->type == NODE_DIRECTIVE) ? "Dir" :
+        (node->type == NODE_OPERATION) ? "OpC" :
+        (node->type == NODE_OPERAND) ? "Op " :
+        (node->type == NODE_OPTION) ? "Opt" :
+        (node->type == NODE_MODE) ? "Mod" :
+        (node->type == NODE_LABEL) ? "Lab" :
+        "Unknown",
+        node->lineNr, node->codeAdr, node->operandType,
+        node->value, (int)value, node->scopeLevel, node->scopeName);
 
-    for (int i = 0; i < node->child_count; i++) {
-        PrintAST(node->children[i], depth + 1);
+    for (int i = 0; i < node->childCount; i++) {
+        printAST(node->children[i], depth + 1);
     }
 }
 
-// --------------------------------------------------------------------------------
-//      PrintTokenCode (code) --> string
-//          This function prints the given code in human readable form.
-// --------------------------------------------------------------------------------
+// ====================================================================================
+//  Debugging Helpers
+// ====================================================================================
 
-void PrintTokenCode(int i) {
-
+/// @brief Print the human-readable representation of a token code.
+/// 
+/// @param i The token code.
+///
+void printTokenCode(int i) {
     switch (i) {
-
     case NONE:          printf("NONE"); break;
-    case T_IDENTIFIER:  printf("%.10s","IDENTIFIER"); break;
+    case T_IDENTIFIER:  printf("IDENTIFIER"); break;
     case T_NUM:         printf("NUM"); break;
     case T_COMMA:       printf("COMMA"); break;
     case T_COLON:       printf("COLON"); break;
@@ -744,713 +642,668 @@ void PrintTokenCode(int i) {
     case T_OR:          printf("OR"); break;
     case T_AND:         printf("AND"); break;
     case T_XOR:         printf("XOR"); break;
-    case T_EOL:		    printf("%.10s", "EOL"); break;
-    case EOF:		    printf("EOF"); break;
-
-    default:		    printf("-----  unknown symbol  -----");
+    case T_EOL:         printf("EOL"); break;
+    case EOF:           printf("EOF"); break;
+    default:            printf("-----  unknown symbol  -----");
     }
 }
 
-// --------------------------------------------------------------------------------
-//      PrintExpressTokenCode (code) --> string
-//          This function prints the given Expression code in human readable form.
-// --------------------------------------------------------------------------------
-
-void PrintSymbolTokenCode(int i) {
-
+/// @brief Print the symbol representation of an expression token.
+/// 
+/// @param i The token code.
+///
+void printSymbolTokenCode(int i) {
     switch (i) {
-
-    case T_LPAREN:        printf("("); break;
-    case T_RPAREN:        printf(")"); break;
-    case T_MINUS:         printf("-"); break;
-    case T_PLUS:          printf("+"); break;
-    case T_MUL:           printf("*"); break;
-    case T_DIV:           printf("/"); break;
-    case T_NEG:           printf("~"); break;
-    case T_MOD:           printf("%%"); break;
-    case T_OR:            printf("|"); break;
-    case T_AND:           printf("&"); break;
-    case T_XOR:           printf("^"); break;
-    case T_EOL:		      printf("EOL"); break;
-    case EOF:		      printf("EOF"); break;
-    case T_IDENTIFIER:    printf("ID"); break;
-
-    default:		    printf("-----  unknown symbol  -----");
+    case T_LPAREN:     printf("("); break;
+    case T_RPAREN:     printf(")"); break;
+    case T_MINUS:      printf("-"); break;
+    case T_PLUS:       printf("+"); break;
+    case T_MUL:        printf("*"); break;
+    case T_DIV:        printf("/"); break;
+    case T_NEG:        printf("~"); break;
+    case T_MOD:        printf("%%"); break;
+    case T_OR:         printf("|"); break;
+    case T_AND:        printf("&"); break;
+    case T_XOR:        printf("^"); break;
+    case T_EOL:        printf("EOL"); break;
+    case EOF:          printf("EOF"); break;
+    case T_IDENTIFIER: printf("ID"); break;
+    default:           printf("-----  unknown symbol  -----");
     }
 }
 
-// -------------------------------------------------------------------------------- 
-//          Parser ProcessLabel
-// --------------------------------------------------------------------------------
+// ====================================================================================
+//  Label and Instruction Parsing
+// ====================================================================================
 
-void ParseLabel() {
+/// @brief Parse a label and normalize it to uppercase.
+///
+void parseLabel() {
     strcpy(label, tokenSave);
-    StrToUpper(label);
-
+    strToUpper(label);
 }
 
-/// @par Parse ADDIL, LDIL
-///     - OP regR, value (22bitS)   
-
-void ParseADDIL_LDIL() {
-    
-    // Here should be regR 
-    if (CheckGenReg() == TRUE) {
-
-        if (DBG_PARSER) {
-            printf("regR %s ", token);
-        }
+/// @brief Parse the `ADDIL` and `LDIL` instructions.
+/// 
+/// Expected syntax:  
+/// `OP regR, value (22-bit signed)`
+/// 
+/// - First operand must be a general-purpose register.  
+/// - Second operand can be an immediate value or memory reference.
+///
+void parseADDIL_LDIL() {
+    // Parse register operand
+    if (checkGenReg() == TRUE) {
+        if (DBG_PARSER) printf("regR %s ", token);
         operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
         strcpy(tokenSave, token);
     }
-    else
-    {
+    else {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
-    // Here should be a comma
-
-    GetNextToken();
+    // Expect a comma
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
-    GetNextToken();
-
-    value = ParseExpression();
-    
+    fetchToken();
+    value = parseExpression();
     strcpy(currentScopeName, scopeNameTab[searchScopeLevel]);
     if (lineERR) return;
-    if (VarType == V_VALUE) {
 
-        if (DBG_PARSER) {
-            printf("[%" PRId64 "]", value);
-        }
+    // Immediate operand
+    if (varType == V_VALUE) {
+        if (DBG_PARSER) printf("[%" PRId64 "]", value);
         operandType = OT_VALUE;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
-        Add_ASTchild(ASTinstruction, ASTop2);
+        ASTop2 = createASTnode(NODE_OPERAND, ">", value);
+        addASTchild(ASTinstruction, ASTop2);
     }
+    // Memory operand
     else {
-
-        if (DBG_PARSER) {
-            printf("Variable %s global/local %d\n", Variable, VarType);
-        }
+        if (DBG_PARSER) printf("Variable %s global/local %d\n", varName, varType);
         operandType = OT_MEMGLOB;
         mode = 3;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, Variable, value);
-        Add_ASTchild(ASTinstruction, ASTop2);
+        ASTop2 = createASTnode(NODE_OPERAND, varName, value);
+        addASTchild(ASTinstruction, ASTop2);
+
         operandType = OT_NOTHING;
-        ASTmode = Create_ASTnode(NODE_MODE, "", mode);
-        Add_ASTchild(ASTinstruction, ASTmode);
+        ASTmode = createASTnode(NODE_MODE, "", mode);
+        addASTchild(ASTinstruction, ASTmode);
         return;
     }
-
- 
 }
 
-/// @par Parse CBR, CBRU
-///     - OP[.<opt1>] regA,regB,ofs
+/// @file
+/// @brief Parsing routines for branch-related instructions (CBR, BR, BRK, BR/BV, BVE, BE).
+///
+/// These functions handle syntax checking, AST node construction, and error reporting
+/// for various conditional and unconditional branch instructions in the assembler.
 
-void ParseCBR_CBRU() {
 
-    if (tokTyp == T_DOT) {                                   // check for  option
-
-        GetNextToken();
+// ========================================================================================
+//  Parse CBR, CBRU
+//      Syntax: OP[.<opt1>] regA, regB, ofs
+// ========================================================================================
+/**
+ * @brief Parse a CBR/CBRU instruction.
+ *
+ * CBR and CBRU are conditional branches that optionally take an instruction option,
+ * followed by two registers (regA and regB), and an offset operand.
+ *
+ * The function validates the presence of registers and delimiters (commas, parentheses),
+ * constructs AST nodes for operands, and reports errors when invalid tokens are encountered.
+ */
+void parseCBR_CBRU() {
+    // Handle optional instruction option (e.g., .<opt1>)
+    if (tokTyp == T_DOT) {
+        fetchToken();
         if (tokTyp == T_IDENTIFIER) {
-
-            if (DBG_PARSER) {
-                printf("OPT1 %s ", token);
-            }
+            if (DBG_PARSER) printf("OPT1 %s ", token);
             operandType = OT_NOTHING;
-            ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
-            Add_ASTchild(ASTinstruction, ASTopt1);
+            ASTopt1 = createASTnode(NODE_OPTION, token, 1);
+            addASTchild(ASTinstruction, ASTopt1);
         }
-        GetNextToken();
+        fetchToken();
     }
-    // Here should be regA
-    if (CheckGenReg() == TRUE) {
 
-        if (DBG_PARSER) {
-            printf("regA %s ", token);
-        }
+    // Expect register A
+    if (checkGenReg() == TRUE) {
+        if (DBG_PARSER) printf("regA %s ", token);
         operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
         strcpy(tokenSave, token);
-    }
-    else
-    {
-        snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-
-    // Here should be a comma
-
-    GetNextToken();
-        if (tokTyp != T_COMMA) {
-        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-    GetNextToken();
-
-    // Here should be regB
-    if (CheckGenReg() == TRUE) {
-
-        if (DBG_PARSER) {
-            printf("regB %s ", token);
-        }
-        operandType = OT_REGISTER;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop2);
-        strcpy(tokenSave, token);
-    }
-    else
-    {
-        snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-
-
-    // Here should be a comma
-    
-    GetNextToken();
-        if (tokTyp != T_COMMA) {
-
-        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-
-    GetNextToken();
-    is_negative = FALSE;
-    if (tokTyp == T_MINUS) {
-
-        is_negative = TRUE;
-        GetNextToken();
-    }
-
-    if (tokTyp == T_NUM) {                  // operand is a number
-
-        value = StrToNum(token);
-        if (is_negative == TRUE) {
-
-            value = 0 - value;
-        }
-        operandType = OT_VALUE;
-        ASTop3 = Create_ASTnode(NODE_OPERAND, ">", value);
-        Add_ASTchild(ASTinstruction, ASTop3);
-    }
-    else if (tokTyp == T_IDENTIFIER) {        // operand is a label 
-
-        operandType = OT_LABEL;
-        ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop3);
-    }
-    
-
-   
-}
-
-/// @par Parse B
-///     - OP ofs [,regR]
-
-void ParseB() {
-    is_negative = FALSE;
-    if (tokTyp == T_MINUS) {
-
-        is_negative = TRUE;
-        GetNextToken();
-    }
-
-    if (tokTyp == T_NUM) {                  // operand is a number
-
-        value = StrToNum(token);
-        if (is_negative == TRUE) {
-
-            value = 0 - value;
-        }
-        operandType = OT_VALUE;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, ">", value);
-        Add_ASTchild(ASTinstruction, ASTop1);
-    }
-    else if (tokTyp == T_IDENTIFIER) {        // operand is a label 
-
-        operandType = OT_LABEL;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
-    }
-
-    // Here should be a comma
-
-    GetNextToken();
-    if (tokTyp == T_COMMA) {
-        GetNextToken();
-        // Here should be regR 
-        if (CheckGenReg() == TRUE) {
-            if (DBG_PARSER) {
-                printf("regR %s ", token);
-            }
-            operandType = OT_REGISTER;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop2);
-        }
-        else {
-            snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
-            return;
-        }
-    }
-    else if (tokTyp != T_EOL) {
-
-        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-
-
-}
-
-/// @par Parse BRK
-///     - BRK info1,info2
-
-void ParseBRK() {
-    if (tokTyp == T_NUM) {                  // operand is a number
-
-        value = StrToNum(token);
-        if (is_negative == TRUE) {
-
-            value = 0 - value;
-        }
-        operandType = OT_VALUE;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, ">", value);
-        Add_ASTchild(ASTinstruction, ASTop1);
-    }
-
-    // Here should be a comma
-
-    GetNextToken();
-    if (tokTyp != T_COMMA) {
-
-        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-    GetNextToken();
-    if (tokTyp == T_NUM) {                  // operand is a number
-
-        value = StrToNum(token);
-        if (is_negative == TRUE) {
-
-            value = 0 - value;
-        }
-        operandType = OT_VALUE;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
-        Add_ASTchild(ASTinstruction, ASTop2);
-    }
-}
-
-
-
-/// @par Parse BR, BV
-///     - OP (regB)[ ,regR ]
-
-void ParseBR_BV() {
-
-    if (tokTyp != T_LPAREN) {
-        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-    GetNextToken();
-
-    // Here should be regB
-    if (CheckGenReg() == TRUE) {
-
-        if (DBG_PARSER) {
-            printf("regR %s ", token);
-        }
-        operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
-        strcpy(tokenSave, token);
-    }
-    else
-    {
-        snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-    GetNextToken();
-    if (tokTyp != T_RPAREN) {
-        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-    GetNextToken();
-    if (tokTyp != T_EOL) {
-        if (tokTyp != T_COMMA) {
-            snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
-            return;
-        }
-        GetNextToken();
-        if (CheckGenReg() == TRUE) {
-            if (DBG_PARSER) {
-                printf("regB %s ", token);
-            }
-            operandType = OT_REGISTER;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop2);
-        }
-        else {
-            snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
-            return;
-        }
-    }
-}
-
-/// @par Parse BVE
-///     - BVE regA (regB) [ ,regR ]
-
-void ParseBVE() {
-
-    // Here should be regA 
-    if (CheckGenReg() == TRUE) {
-
-        if (DBG_PARSER) {
-            printf("regA %s ", token);
-        }
-        operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
-        strcpy(tokenSave, token);
-    }
-    else
-    {
-        snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-    // Here should be LPAREN
-    GetNextToken();
-    if (tokTyp != T_LPAREN) {
-        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-    GetNextToken();
-    // Here should be regB 
-    if (CheckGenReg() == TRUE) {
-        if (DBG_PARSER) {
-            printf("regB %s ", token);
-        }
-        operandType = OT_REGISTER;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop2);
     }
     else {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-    // Here should be RPAREN
-    GetNextToken();
-    if (tokTyp != T_RPAREN) {
-        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
-    // Here should be a comma
- 
-    GetNextToken();
+    // Expect comma
+    fetchToken();
+    if (tokTyp != T_COMMA) {
+        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+        processError(errmsg);
+        return;
+    }
+    fetchToken();
+
+    // Expect register B
+    if (checkGenReg() == TRUE) {
+        if (DBG_PARSER) printf("regB %s ", token);
+        operandType = OT_REGISTER;
+        ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop2);
+        strcpy(tokenSave, token);
+    }
+    else {
+        snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
+        processError(errmsg);
+        return;
+    }
+
+    // Expect comma
+    fetchToken();
+    if (tokTyp != T_COMMA) {
+        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+        processError(errmsg);
+        return;
+    }
+    fetchToken();
+
+    // Handle optional negative sign before offset
+    is_negative = FALSE;
+    if (tokTyp == T_MINUS) {
+        is_negative = TRUE;
+        fetchToken();
+    }
+
+    // Parse offset operand
+    if (tokTyp == T_NUM) {
+        value = strToNum(token);
+        if (is_negative) value = -value;
+        operandType = OT_VALUE;
+        ASTop3 = createASTnode(NODE_OPERAND, ">", value);
+        addASTchild(ASTinstruction, ASTop3);
+    }
+    else if (tokTyp == T_IDENTIFIER) {
+        operandType = OT_LABEL;
+        ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop3);
+    }
+}
+
+
+// ========================================================================================
+//  Parse B
+//      Syntax: OP ofs [,regR]
+// ========================================================================================
+/**
+ * @brief Parse a B (unconditional branch) instruction.
+ *
+ * The branch takes an offset operand, optionally followed by a register.
+ * This function handles numeric offsets, labels, and validates register syntax.
+ */
+void parseB() {
+    // Optional negative offset
+    is_negative = FALSE;
+    if (tokTyp == T_MINUS) {
+        is_negative = TRUE;
+        fetchToken();
+    }
+
+    // Parse offset
+    if (tokTyp == T_NUM) {
+        value = strToNum(token);
+        if (is_negative) value = -value;
+        operandType = OT_VALUE;
+        ASTop1 = createASTnode(NODE_OPERAND, ">", value);
+        addASTchild(ASTinstruction, ASTop1);
+    }
+    else if (tokTyp == T_IDENTIFIER) {
+        operandType = OT_LABEL;
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
+    }
+
+    // Optional comma + register
+    fetchToken();
     if (tokTyp == T_COMMA) {
-        GetNextToken();
-        // Here should be regR 
-        if (CheckGenReg() == TRUE) {
-            if (DBG_PARSER) {
-                printf("regR %s ", token);
-            }
+        fetchToken();
+        if (checkGenReg() == TRUE) {
+            if (DBG_PARSER) printf("regR %s ", token);
             operandType = OT_REGISTER;
-            ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop3);
+            ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop2);
         }
         else {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else if (tokTyp != T_EOL) {
-
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 }
 
-/// @par Parse BE
-///     - BE ofs(regA,regB)[,regR]
 
-void ParseBE() {
+// ========================================================================================
+//  Parse BRK
+//      Syntax: BRK info1, info2
+// ========================================================================================
+/**
+ * @brief Parse a BRK instruction.
+ *
+ * BRK takes two numeric operands. This function validates syntax and constructs AST nodes
+ * for both operands.
+ */
+void parseBRK() {
+    if (tokTyp == T_NUM) {
+        value = strToNum(token);
+        if (is_negative) value = -value;
+        operandType = OT_VALUE;
+        ASTop1 = createASTnode(NODE_OPERAND, ">", value);
+        addASTchild(ASTinstruction, ASTop1);
+    }
 
-    value = ParseExpression();
+    // Expect comma + second numeric operand
+    fetchToken();
+    if (tokTyp != T_COMMA) {
+        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+        processError(errmsg);
+        return;
+    }
+    fetchToken();
+    if (tokTyp == T_NUM) {
+        value = strToNum(token);
+        if (is_negative) value = -value;
+        operandType = OT_VALUE;
+        ASTop2 = createASTnode(NODE_OPERAND, ">", value);
+        addASTchild(ASTinstruction, ASTop2);
+    }
+}
+
+
+// ========================================================================================
+//  Parse BR, BV
+//      Syntax: OP (regB)[, regR]
+// ========================================================================================
+/**
+ * @brief Parse a BR or BV instruction.
+ *
+ * These branch instructions require a base register enclosed in parentheses,
+ * optionally followed by a register operand.
+ */
+void parseBR_BV() {
+    // Expect LPAREN
+    if (tokTyp != T_LPAREN) {
+        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+        processError(errmsg);
+        return;
+    }
+    fetchToken();
+
+    // Expect register B
+    if (checkGenReg() == TRUE) {
+        if (DBG_PARSER) printf("regR %s ", token);
+        operandType = OT_REGISTER;
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
+        strcpy(tokenSave, token);
+    }
+    else {
+        snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
+        processError(errmsg);
+        return;
+    }
+
+    // Expect RPAREN
+    fetchToken();
+    if (tokTyp != T_RPAREN) {
+        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+        processError(errmsg);
+        return;
+    }
+
+    // Optional trailing register
+    fetchToken();
+    if (tokTyp == T_COMMA) {
+        fetchToken();
+        if (checkGenReg() == TRUE) {
+            if (DBG_PARSER) printf("regB %s ", token);
+            operandType = OT_REGISTER;
+            ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop2);
+        }
+        else {
+            snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+            processError(errmsg);
+            return;
+        }
+    }
+    else if (tokTyp != T_EOL) {
+        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+        processError(errmsg);
+    }
+}
+
+
+// ========================================================================================
+//  Parse BVE
+//      Syntax: BVE regA (regB)[, regR]
+// ========================================================================================
+/**
+ * @brief Parse a BVE instruction.
+ *
+ * BVE requires a register A, a base register B enclosed in parentheses,
+ * and optionally an additional register R.
+ */
+void parseBVE() {
+    // Expect regA
+    if (checkGenReg() == TRUE) {
+        if (DBG_PARSER) printf("regA %s ", token);
+        operandType = OT_REGISTER;
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
+        strcpy(tokenSave, token);
+    }
+    else {
+        snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
+        processError(errmsg);
+        return;
+    }
+
+    // Expect (regB)
+    fetchToken();
+    if (tokTyp != T_LPAREN) { processError("Expected '('"); return; }
+    fetchToken();
+    if (checkGenReg() == TRUE) {
+        operandType = OT_REGISTER;
+        ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop2);
+    }
+    else {
+        snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
+        processError(errmsg);
+        return;
+    }
+    fetchToken();
+    if (tokTyp != T_RPAREN) { processError("Expected ')'"); return; }
+
+    // Optional regR
+    fetchToken();
+    if (tokTyp == T_COMMA) {
+        fetchToken();
+        if (checkGenReg() == TRUE) {
+            if (DBG_PARSER) printf("regR %s ", token);
+            operandType = OT_REGISTER;
+            ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop3);
+        }
+        else {
+            snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
+            processError(errmsg);
+        }
+    }
+    else if (tokTyp != T_EOL) {
+        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
+        processError(errmsg);
+    }
+}
+
+
+// ========================================================================================
+//  Parse BE
+//      Syntax: BE ofs(regA, regB)[, regR]
+// ========================================================================================
+/**
+ * @brief Parse a BE instruction.
+ *
+ * BE instructions branch to an offset computed from an immediate or variable
+ * plus the values in registers A and B, with an optional register R.
+ */
+void parseBE() {
+    // Parse expression for offset
+    value = parseExpression();
     strcpy(currentScopeName, scopeNameTab[searchScopeLevel]);
-
     if (lineERR) return;
 
-    if (VarType == V_VALUE) {
-
-        if (DBG_PARSER) {
-            printf("[%" PRId64 "]", value);
-        }
+    // Handle value vs variable
+    if (varType == V_VALUE) {
         operandType = OT_VALUE;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, ">", value);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, ">", value);
+        addASTchild(ASTinstruction, ASTop1);
     }
     else {
-
-        if (DBG_PARSER) {
-            printf("Variable %s global/local %d\n", Variable, VarType);
-        }
         operandType = OT_MEMGLOB;
         mode = 3;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, Variable, value);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, varName, value);
+        addASTchild(ASTinstruction, ASTop1);
         return;
     }
 
-    // Here should be LPAREN
+    // Expect (regA, regB)
+    if (tokTyp != T_LPAREN) { processError("Expected '('"); return; }
+    fetchToken();
+    if (!checkGenReg()) { processError("Invalid regA"); return; }
+    ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+    addASTchild(ASTinstruction, ASTop2);
 
-    if (tokTyp != T_LPAREN) {
-        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-    GetNextToken();
-    // Here should be regA 
-    if (CheckGenReg() == TRUE) {
-        if (DBG_PARSER) {
-            printf("regB %s ", token);
-        }
-        operandType = OT_REGISTER;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop2);
-    }
-    else {
-        snprintf(errmsg, sizeof(errmsg), "Invalid 1register name %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
+    fetchToken();
+    if (tokTyp != T_COMMA) { processError("Expected ','"); return; }
+    fetchToken();
+    if (!checkGenReg()) { processError("Invalid regB"); return; }
+    ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+    addASTchild(ASTinstruction, ASTop3);
 
-    // Here should be a comma
+    fetchToken();
+    if (tokTyp != T_RPAREN) { processError("Expected ')'"); return; }
 
-    GetNextToken();
-    if (tokTyp != T_COMMA) {
-        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-    GetNextToken();
-    // Here should be regB 
-    if (CheckGenReg() == TRUE) {
-        if (DBG_PARSER) {
-            printf("regB %s ", token);
-        }
-        operandType = OT_REGISTER;
-        ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop3);
-    }
-    else {
-        snprintf(errmsg, sizeof(errmsg), "Invalid 2register name %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-    // Here should be a RPAREN
-    GetNextToken();
-    if (tokTyp != T_RPAREN) {
-        snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
-        return;
-    }
-
-    // Here should be a comma
- 
-    GetNextToken();
+    // Optional regR
+    fetchToken();
     if (tokTyp == T_COMMA) {
-        GetNextToken();
-        // Here should be regR 
-        if (CheckGenReg() == TRUE) {
-            if (DBG_PARSER) {
-                printf("regR %s ", token);
-            }
-            operandType = OT_REGISTER;
-            ASTop4 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop4);
+        fetchToken();
+        if (checkGenReg() == TRUE) {
+            ASTop4 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop4);
         }
         else {
-            snprintf(errmsg, sizeof(errmsg), "Invalid 3register name %s ", token);
-            ProcessError(errmsg);
-            return;
+            processError("Invalid regR");
         }
     }
     else if (tokTyp != T_EOL) {
-
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
-        return;
+        processError(errmsg);
     }
-
-
 }
 
 
-/// @par Parse PCA, PTLB
-///     - PCA[.<TM>] regA([regS,]regB)
-///     - PTLB[.<TM>] regA([regS,]regB)
+///--------------------------------------------------------
 
-void ParsePCA_PTLB() {
+// =================================================================================
+// Parse PCA / PTLB Instruction
+// =================================================================================
+
+/// @brief Parse the PCA or PTLB instruction.
+/// @details
+/// **Syntax:**
+/// - `PCA[.<TM>] regA([regS,]regB)`
+/// - `PTLB[.<TM>] regA([regS,]regB)`
+///
+/// **Operands:**
+/// - `regA` : destination register
+/// - `regS` : optional segment register (if present, must be followed by a comma)
+/// - `regB` : source register inside parentheses
+///
+/// **Options:**
+/// - `.TM` : optional instruction modifier
+///
+/// This function enforces correct parenthesis usage, comma placement,
+/// and ensures valid register types.
+
+void parsePCA_PTLB() {
 
     // Check Option
 
     if (tokTyp == T_DOT) {
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp == T_IDENTIFIER) {
 
             if (DBG_PARSER) {
                 printf("OPT1 %s ", token);
             }
             operandType = OT_NOTHING;
-            ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
-            Add_ASTchild(ASTinstruction, ASTopt1);
+            ASTopt1 = createASTnode(NODE_OPTION, token, 1);
+            addASTchild(ASTinstruction, ASTopt1);
         }
-        GetNextToken();
+        fetchToken();
     }
 
     // Here should be regA
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
         if (DBG_PARSER) {
             printf("regB %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
-        GetNextToken();
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
+        fetchToken();
     }
 
     if (tokTyp != T_LPAREN) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regB or regS 1-3
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
         if (DBG_PARSER) {
             printf("regB %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop2);
+        ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop2);
     }
-    else if (CheckSegReg() == TRUE) {
+    else if (checkSegReg() == TRUE) {
         if (DBG_PARSER) {
             printf("regB %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop2);
+        ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop2);
         // Here should be a comma
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp != T_COMMA) {
             snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
-        GetNextToken();
-        if (CheckGenReg() == TRUE) {
+        fetchToken();
+        if (checkGenReg() == TRUE) {
             if (DBG_PARSER) {
                 printf("regB %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop4 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop4);
+            ASTop4 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop4);
         }
         else {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
     // Here should be a RPAREN
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_RPAREN) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 }
 
-/// @par Parse MR
-///     - MR regR,<regS|regC>
-///     - MR <regS|regC>,regR
+// =================================================================================
+// Parse MR Instruction
+// =================================================================================
+
+/// @brief Parse the MR (Move Register) instruction.
+/// @details
+/// **Syntax:**
+/// - `MR regR, <regS|regC>`
+/// - `MR <regS|regC>, regR`
+///
+/// **Operands:**
+/// - `regR` : general-purpose register
+/// - `regS` : segment register
+/// - `regC` : control register
+///
+/// **Options:**
+/// - Implicit options `M`, `D`, `DM` are inserted depending on register pairing:
+///   - `M` : general → control
+///   - `D` : segment → general
+///   - `DM` : control → general
+///
+/// Errors are raised if invalid combinations of register classes are detected.
 
 
-void ParseMR() {
+void parseMR() {
 
     // check if general register
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         mode = 0;
     }
-    else if (CheckSegReg() == TRUE) {
+    else if (checkSegReg() == TRUE) {
         mode = 1;
     }
-    else if (CheckCtrlReg() == TRUE) {
+    else if (checkCtrlReg() == TRUE) {
         mode = 2;
     } 
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
     operandType = OT_REGISTER;
-    ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-    Add_ASTchild(ASTinstruction, ASTop1);
+    ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+    addASTchild(ASTinstruction, ASTop1);
 
 
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     char MRopt[10];
     strcpy(MRopt, "  ");
@@ -1459,60 +1312,77 @@ void ParseMR() {
 
 
     if (mode == 0) {
-        if (CheckSegReg() == TRUE) {
+        if (checkSegReg() == TRUE) {
             strcpy(MRopt, "");
 
         }
-        else if (CheckCtrlReg() == TRUE) {
+        else if (checkCtrlReg() == TRUE) {
             strcpy(MRopt, "M");
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else if (mode == 1) {
-        if (CheckGenReg() == TRUE) {
+        if (checkGenReg() == TRUE) {
             strcpy(MRopt, "D");
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else if (mode == 2) {
-        if (CheckGenReg() == TRUE) {
+        if (checkGenReg() == TRUE) {
             strcpy(MRopt, "DM");
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     operandType = OT_REGISTER;
-    ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-    Add_ASTchild(ASTinstruction, ASTop2);
+    ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+    addASTchild(ASTinstruction, ASTop2);
 
     operandType = OT_NOTHING;
-    ASTopt1 = Create_ASTnode(NODE_OPTION, MRopt, 1);
-    Add_ASTchild(ASTinstruction, ASTopt1);
+    ASTopt1 = createASTnode(NODE_OPTION, MRopt, 1);
+    addASTchild(ASTinstruction, ASTopt1);
 
  //   printf("MR %d    %s\n",  lineNr,  MRopt);
 
 
 }
 
-/// @par Parse MST
-///     - MST   regR,regB
-///     - MST.<S|C> regR, val
+// =================================================================================
+// Parse MST Instruction
+// =================================================================================
 
-void ParseMST() {
+/// @brief Parse the MST (Move to Special) instruction.
+/// @details
+/// **Syntax:**
+/// - `MST regR, regB`
+/// - `MST.<S|C> regR, val`
+///
+/// **Operands:**
+/// - `regR` : destination register
+/// - `regB` : source general-purpose register
+/// - `val`  : immediate value (when `.S` or `.C` option is used)
+///
+/// **Options:**
+/// - `.S` or `.C` : specify special value assignment instead of register transfer
+///
+/// This parser handles both register-to-register and register-to-value forms,
+/// including expression parsing for constants.
+
+void parseMST() {
 
     mode = 0;                       // no option found
 
@@ -1520,229 +1390,247 @@ void ParseMST() {
 
     if (tokTyp == T_DOT) {
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp == T_IDENTIFIER) {
 
             if (DBG_PARSER) {
                 printf("OPT1 %s ", token);
             }
             operandType = OT_NOTHING;
-            ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
-            Add_ASTchild(ASTinstruction, ASTopt1);
+            ASTopt1 = createASTnode(NODE_OPTION, token, 1);
+            addASTchild(ASTinstruction, ASTopt1);
             mode = 1;
         }
-        GetNextToken();
+        fetchToken();
     }
     else {
         strcpy(buffer, " ");
         operandType = OT_NOTHING;
-        ASTopt1 = Create_ASTnode(NODE_OPTION, buffer, 1);
-        Add_ASTchild(ASTinstruction, ASTopt1);
+        ASTopt1 = createASTnode(NODE_OPTION, buffer, 1);
+        addASTchild(ASTinstruction, ASTopt1);
     }
     // Here should be regR 
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         if (DBG_PARSER) {
             printf("regR %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
         strcpy(tokenSave, token);
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     if (mode == 1) {
-        value = ParseExpression();
+        value = parseExpression();
 
         strcpy(currentScopeName, scopeNameTab[searchScopeLevel]);
         if (lineERR) return;
-        if (VarType == V_VALUE) {
+        if (varType == V_VALUE) {
 
             if (DBG_PARSER) {
                 printf("[%" PRId64 "]", value);
             }
             operandType = OT_VALUE;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
-            Add_ASTchild(ASTinstruction, ASTop2);
+            ASTop2 = createASTnode(NODE_OPERAND, ">", value);
+            addASTchild(ASTinstruction, ASTop2);
         }
 
     }
     else {
         // Here should be regB 
 
-        if (CheckGenReg() == TRUE) {
+        if (checkGenReg() == TRUE) {
 
             if (DBG_PARSER) {
                 printf("regB %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop2);
+            ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop2);
             strcpy(tokenSave, token);
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
 }
 
 
-/// @par Parse PRB
-///     - PRB[.<WI>] regR,([regS],regB)[,regA]
+// =================================================================================
+// Parse PRB Instruction
+// =================================================================================
 
-void ParsePRB() {
+/// @brief Parse the PRB instruction.
+/// @details
+/// **Syntax:**
+/// - `PRB[.<WI>] regR, ([regS], regB) [, regA]`
+///
+/// **Operands:**
+/// - `regR` : base register
+/// - `regS` : optional segment register
+/// - `regB` : primary source register inside parentheses
+/// - `regA` : optional trailing register after parentheses
+///
+/// **Options:**
+/// - `.WI` : optional width indicator
+///
+/// This function validates nested parentheses, optional segment usage,
+/// and trailing register arguments.
+
+void parsePRB() {
 
     // Check Option
 
     if (tokTyp == T_DOT) {
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp == T_IDENTIFIER) {
 
             if (DBG_PARSER) {
                 printf("OPT1 %s ", token);
             }
             operandType = OT_NOTHING;
-            ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
-            Add_ASTchild(ASTinstruction, ASTopt1);
+            ASTopt1 = createASTnode(NODE_OPTION, token, 1);
+            addASTchild(ASTinstruction, ASTopt1);
         }
-        GetNextToken();
+        fetchToken();
     }
 
     // Here should be regR 
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         if (DBG_PARSER) {
             printf("regR %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
         strcpy(tokenSave, token);
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
     is_negative = FALSE;
     if (tokTyp == T_MINUS) {
 
         is_negative = TRUE;
-        GetNextToken();
+        fetchToken();
     }
 
  
     if (tokTyp != T_LPAREN) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regB or regS 1-3
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
         if (DBG_PARSER) {
             printf("regB %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop2);
+        ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop2);
     }
-    else if (CheckSegReg() == TRUE) {
+    else if (checkSegReg() == TRUE) {
         if (DBG_PARSER) {
             printf("regB %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop2);
+        ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop2);
         // Here should be a comma
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp != T_COMMA) {
             snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
-        GetNextToken();
-        if (CheckGenReg() == TRUE) {
+        fetchToken();
+        if (checkGenReg() == TRUE) {
             if (DBG_PARSER) {
                 printf("regB %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop3);
+            ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop3);
         }
         else {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
     // Here should be a RPAREN
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_RPAREN) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
     // check for  a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp == T_COMMA) {
-        GetNextToken();
-        if (CheckGenReg() == TRUE) {
+        fetchToken();
+        if (checkGenReg() == TRUE) {
 
             if (DBG_PARSER) {
                 printf("regR %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop1);
+            ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop1);
             strcpy(tokenSave, token);
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
@@ -1750,681 +1638,785 @@ void ParsePRB() {
 
 }
 
-/// @par Parse LSID
-///     - LSID  regR, regB
+// =================================================================================
+// Parse LSID Instruction
+// =================================================================================
 
-void ParseLSID() {
+/// @brief Parse the LSID instruction.
+/// @details
+/// **Syntax:**
+/// - `LSID regR, regB`
+///
+/// **Operands:**
+/// - `regR` : destination register
+/// - `regB` : base register
+///
+/// This instruction form is simple and expects two general-purpose registers,
+/// separated by a comma.
+
+void parseLSID() {
     // Here should be regR 
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         if (DBG_PARSER) {
             printf("regR %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
         strcpy(tokenSave, token);
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regB
 
     if (tokTyp == T_IDENTIFIER) {
 
-        if (CheckGenReg() == TRUE) {
+        if (checkGenReg() == TRUE) {
 
             if (DBG_PARSER) {
                 printf("regB %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop2);
+            ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop2);
             strcpy(tokenSave, token);
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
 }
 
-/// @par Parse ITLB
-///     - ITLB[.T] regR,(regS,regB)
+// =================================================================================
+// Parse ITLB Instruction
+// =================================================================================
 
-void ParseITLB() {
+/// @brief Parse the ITLB instruction.
+/// @details
+/// **Syntax:**
+/// - `ITLB[.T] regR, (regS, regB)`
+///
+/// **Operands:**
+/// - `regR` : general-purpose register
+/// - `regS` : segment register
+/// - `regB` : base register
+///
+/// **Options:**
+/// - `.T` : optional flag to indicate a translation operation
+///
+/// This function enforces parentheses grouping `(regS, regB)`
+/// and ensures proper operand classification.
+
+void parseITLB() {
 
     // Check Option
 
     if (tokTyp == T_DOT) {
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp == T_IDENTIFIER) {
 
             if (DBG_PARSER) {
                 printf("OPT1 %s ", token);
             }
             operandType = OT_NOTHING;
-            ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
-            Add_ASTchild(ASTinstruction, ASTopt1);
+            ASTopt1 = createASTnode(NODE_OPTION, token, 1);
+            addASTchild(ASTinstruction, ASTopt1);
         }
-        GetNextToken();
+        fetchToken();
     }
     // Here should be regR 
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         if (DBG_PARSER) {
             printf("regR %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
         strcpy(tokenSave, token);
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a LPAREN
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_LPAREN) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regS
 
     if (tokTyp == T_IDENTIFIER) {
 
-        if (CheckSegReg() == TRUE) {
+        if (checkSegReg() == TRUE) {
 
             if (DBG_PARSER) {
                 printf("regS %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop2);
+            ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop2);
             strcpy(tokenSave, token);
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regB
 
     if (tokTyp == T_IDENTIFIER) {
 
-        if (CheckGenReg() == TRUE) {
+        if (checkGenReg() == TRUE) {
 
             if (DBG_PARSER) {
                 printf("regB %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop3);
+            ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop3);
             strcpy(tokenSave, token);
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 }
 
-/// @par Parse SHLA
-///     - SHLA[.<LO> regR, regA, regB, shamt
+/// ---------------------------------------------------------
 
-void ParseSHLA() {
+
+// =================================================================================
+// Parse SHLA Instruction
+// =================================================================================
+
+/// @brief Parse the SHLA instruction.
+/// @details
+/// Syntax:
+/// - `SHLA[.<LO>] regR, regA, regB, shamt`
+///
+/// The parser:
+/// - Optionally processes an instruction option (`.<LO>`).
+/// - Expects destination register `regR`.
+/// - Expects source registers `regA` and `regB`.
+/// - Expects a shift amount (`shamt`).
+///
+/// @note Errors are reported via processError().
+
+void parseSHLA() {
 
     // Check Option
 
     if (tokTyp == T_DOT) {
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp == T_IDENTIFIER) {
 
             if (DBG_PARSER) {
                 printf("OPT1 %s ", token);
             }
             operandType = OT_NOTHING;
-            ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
-            Add_ASTchild(ASTinstruction, ASTopt1);
+            ASTopt1 = createASTnode(NODE_OPTION, token, 1);
+            addASTchild(ASTinstruction, ASTopt1);
         }
-        GetNextToken();
+        fetchToken();
     }
 
     // Here should be regR 
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         if (DBG_PARSER) {
             printf("regR %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
         strcpy(tokenSave, token);
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regA
 
     if (tokTyp == T_IDENTIFIER) {
 
-        if (CheckGenReg() == TRUE) {
+        if (checkGenReg() == TRUE) {
 
             if (DBG_PARSER) {
                 printf("regA %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop2);
+            ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop2);
             strcpy(tokenSave, token);
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regB
 
     if (tokTyp == T_IDENTIFIER) {
 
-        if (CheckGenReg() == TRUE) {
+        if (checkGenReg() == TRUE) {
 
             if (DBG_PARSER) {
                 printf("regB %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop3);
+            ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop3);
             strcpy(tokenSave, token);
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
-    value = ParseExpression();
-    if (VarType == V_VALUE) {
+    fetchToken();
+    value = parseExpression();
+    if (varType == V_VALUE) {
 
         operandType = OT_VALUE;
-        ASTop4 = Create_ASTnode(NODE_OPERAND, ">", value);
-        Add_ASTchild(ASTinstruction, ASTop4);
+        ASTop4 = createASTnode(NODE_OPERAND, ">", value);
+        addASTchild(ASTinstruction, ASTop4);
         strcpy(tokenSave, token);
     }
 
 }
 
-/// @par Parse LDPA
-///     - LDPA   regR,ofs([regs],regB)
+// =================================================================================
+// Parse LDPA Instruction
+// =================================================================================
 
-void ParseLDPA() {
+/// @brief Parse the LDPA instruction.
+/// @details
+/// Syntax:
+/// - `LDPA regR, ofs([regs], regB)`
+///
+/// The parser:
+/// - Expects destination register `regR`.
+/// - Handles optional negative offset.
+/// - Validates offset register (`regA`).
+/// - Parses addressing mode with base register (`regB`) or segment register + general register.
+/// - Requires closing parenthesis `)`.
+///
+/// @note Errors are reported if syntax or registers are invalid.
+
+void parseLDPA() {
 
     // Here should be regR 
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         if (DBG_PARSER) {
             printf("regR %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
         strcpy(tokenSave, token);
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
     is_negative = FALSE;
     if (tokTyp == T_MINUS) {
 
         is_negative = TRUE;
-        GetNextToken();
+        fetchToken();
     }
 
     // Here should be regA
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
             if (DBG_PARSER) {
                 printf("regB %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop2);
-            GetNextToken();
+            ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop2);
+            fetchToken();
     }
   
     if (tokTyp != T_LPAREN) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regB or regS 1-3
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
         if (DBG_PARSER) {
             printf("regB %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop3);
+        ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop3);
     }
-    else if (CheckSegReg() == TRUE) {
+    else if (checkSegReg() == TRUE) {
         if (DBG_PARSER) {
             printf("regB %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop3);
+        ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop3);
         // Here should be a comma
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp != T_COMMA) {
             snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
-        GetNextToken();
-        if (CheckGenReg() == TRUE) {
+        fetchToken();
+        if (checkGenReg() == TRUE) {
             if (DBG_PARSER) {
                 printf("regB %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop4 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop4);
+            ASTop4 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop4);
         }
         else {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
     // Here should be a RPAREN
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_RPAREN) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
 }
 
-/// @par Parse LDR und STC
-///     - OP   regR,ofs([regs],regB)
+// =================================================================================
+// Parse LDR / STC Instruction
+// =================================================================================
 
-void ParseLDR_STC() {
+/// @brief Parse the LDR or STC instructions.
+/// @details
+/// Syntax:
+/// - `OP[.<opt>] regR, ofs([regs], regB)`
+///
+/// The parser:
+/// - Optionally processes an instruction modifier (e.g., `.opt`).
+/// - Expects destination register `regR`.
+/// - Parses an immediate offset or variable.
+/// - Expects base register or segment register + index register inside parentheses.
+/// - Validates closing parenthesis `)`.
+///
+/// @note Used for both load (LDR) and store (STC) instructions.
+
+void parseLDR_STC() {
 
     // Check Option
 
     if (tokTyp == T_DOT) {
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp == T_IDENTIFIER) {
 
             if (DBG_PARSER) {
                 printf("OPT1 %s ", token);
             }
             operandType = OT_NOTHING;
-            ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
-            Add_ASTchild(ASTinstruction, ASTopt1);
+            ASTopt1 = createASTnode(NODE_OPTION, token, 1);
+            addASTchild(ASTinstruction, ASTopt1);
         }
-        GetNextToken();
+        fetchToken();
     }
 
     // Here should be regR 
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         if (DBG_PARSER) {
             printf("regR %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
         strcpy(tokenSave, token);
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
-    value = ParseExpression();
+    value = parseExpression();
     strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
     if (lineERR) return;
-    if (VarType == V_VALUE) {
+    if (varType == V_VALUE) {
 
         if (DBG_PARSER) {
             printf("[%" PRId64 "]", value);
         }
         operandType = OT_VALUE;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
-        Add_ASTchild(ASTinstruction, ASTop2);
+        ASTop2 = createASTnode(NODE_OPERAND, ">", value);
+        addASTchild(ASTinstruction, ASTop2);
     }
     else {
 
         if (DBG_PARSER) {
-            printf("Variable %s global/local %d\n", Variable, VarType);
+            printf("Variable %s global/local %d\n", varName, varType);
         }
         operandType = OT_MEMGLOB;
         mode = 3;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, Variable, value);
-        Add_ASTchild(ASTinstruction, ASTop2);
+        ASTop2 = createASTnode(NODE_OPERAND, varName, value);
+        addASTchild(ASTinstruction, ASTop2);
         return;
     }
     if (tokTyp != T_LPAREN) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regB or regS 1-3
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
         if (DBG_PARSER) {
             printf("regB %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop3);
+        ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop3);
     }
-    else if (CheckSegReg() == TRUE) {
+    else if (checkSegReg() == TRUE) {
         if (DBG_PARSER) {
             printf("regB %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop3);
+        ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop3);
         // Here should be a comma
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp != T_COMMA) {
             snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
-        GetNextToken();
-        if (CheckGenReg() == TRUE) {
+        fetchToken();
+        if (checkGenReg() == TRUE) {
             if (DBG_PARSER) {
                 printf("regB %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop4 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop4);
+            ASTop4 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop4);
         }
         else {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
     // Here should be a RPAREN
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_RPAREN) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
 }
 
-/// @par Parse LDO
-///     - LDO   regR,ofs(regB)
+// =================================================================================
+// Parse LDO Instruction
+// =================================================================================
 
-void ParseLDO() {
+/// @brief Parse the LDO instruction.
+/// @details
+/// Syntax:
+/// - `LDO regR, ofs(regB)`
+///
+/// The parser:
+/// - Expects destination register `regR`.
+/// - Parses immediate offset or variable.
+/// - Requires a base register `regB` inside parentheses.
+/// - Validates proper token sequence and reports unexpected end-of-line or missing arguments.
+///
+/// @note Adds addressing mode information to AST.
+
+void parseLDO() {
 
     // Here should be regR 
 
     if (tokTyp == T_IDENTIFIER) {
 
-        if (CheckGenReg() == TRUE) {
+        if (checkGenReg() == TRUE) {
 
             if (DBG_PARSER) {
                 printf("regR %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop1);
+            ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop1);
             strcpy(tokenSave, token);
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
-    value = ParseExpression();
+    fetchToken();
+    value = parseExpression();
     strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
     if (lineERR) return;
-    if (VarType == V_VALUE) {
+    if (varType == V_VALUE) {
 
         if (DBG_PARSER) {
             printf("[%" PRId64 "]", value);
         }
         operandType = OT_VALUE;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
-        Add_ASTchild(ASTinstruction, ASTop2);
+        ASTop2 = createASTnode(NODE_OPERAND, ">", value);
+        addASTchild(ASTinstruction, ASTop2);
     }
     else {
 
         if (DBG_PARSER) {
-            printf("Variable %s global/local %d\n", Variable, VarType);
+            printf("Variable %s global/local %d\n", varName, varType);
         }
         operandType = OT_MEMGLOB;
         mode = 3;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, Variable, value);
-        Add_ASTchild(ASTinstruction, ASTop2);
+        ASTop2 = createASTnode(NODE_OPERAND, varName, value);
+        addASTchild(ASTinstruction, ASTop2);
         operandType = OT_NOTHING;
-        ASTmode = Create_ASTnode(NODE_MODE, "", mode);
-        Add_ASTchild(ASTinstruction, ASTmode);
+        ASTmode = createASTnode(NODE_MODE, "", mode);
+        addASTchild(ASTinstruction, ASTmode);
         return;
     }
-    GetNextToken();
+    fetchToken();
     if (tokTyp == T_EOL) {
 
         snprintf(errmsg, sizeof(errmsg), "Unexpected EOL ");
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
     else if (tokTyp == T_RPAREN) {
 
         snprintf(errmsg, sizeof(errmsg), "Missing Argument between brackets ");
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
         if (DBG_PARSER) {
             printf("regB %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop3);
+        ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop3);
 
     }
     
 }
 
 
-/// @par Parse DSR
-///     - DSR   regR,regB,regA
-///     - DSR.A regR,regB,regA,shAmt
+// =================================================================================
+// Parse DSR Instruction
+// =================================================================================
 
-void ParseDSR() {
+/// @brief Parse the DSR instruction.
+/// @details
+/// Syntax:
+/// - `DSR regR, regB, regA`
+/// - `DSR.A regR, regB, regA, shAmt`
+///
+/// The parser:
+/// - Optionally parses instruction option (e.g., `.A`).
+/// - Expects destination and source registers (`regR`, `regB`, `regA`).
+/// - If option present, expects an additional shift amount operand (`shAmt`).
+///
+/// @note Reports syntax and register errors via processError().
+
+void parseDSR() {
 
     bool was_option = FALSE;
 
@@ -2432,94 +2424,94 @@ void ParseDSR() {
 
     if (tokTyp == T_DOT) {
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp == T_IDENTIFIER) {
 
             if (DBG_PARSER) {
                 printf("OPT1 %s ", token);
             }
             operandType = OT_NOTHING;
-            ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
-            Add_ASTchild(ASTinstruction, ASTopt1);
+            ASTopt1 = createASTnode(NODE_OPTION, token, 1);
+            addASTchild(ASTinstruction, ASTopt1);
 
             was_option = TRUE;
         }
-        GetNextToken();
+        fetchToken();
     }
 
     // Here should be regR 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         if (DBG_PARSER) {
             printf("regR %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
         strcpy(tokenSave, token);
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regB
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         if (DBG_PARSER) {
             printf("regR %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop2);
+        ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop2);
         strcpy(tokenSave, token);
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regA
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         if (DBG_PARSER) {
             printf("regR %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop3);
+        ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop3);
         strcpy(tokenSave, token);
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
@@ -2528,31 +2520,46 @@ void ParseDSR() {
     if (was_option == TRUE) {
         // Here should be a comma
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp != T_COMMA) {
             snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
-        GetNextToken();
-        value = ParseExpression();
-        if (VarType == V_VALUE) {
+        fetchToken();
+        value = parseExpression();
+        if (varType == V_VALUE) {
 
             operandType = OT_VALUE;
-            ASTop4 = Create_ASTnode(NODE_OPERAND, ">", value);
-            Add_ASTchild(ASTinstruction, ASTop4);
+            ASTop4 = createASTnode(NODE_OPERAND, ">", value);
+            addASTchild(ASTinstruction, ASTop4);
             strcpy(tokenSave, token);
         }
     }
 
 }
 
+///------------------------------------------------------------------------------
 
-/// @par Parse EXTR
-///     - EXTR   regR,regB,pos,len
-///     - EXTR.A regR,regB,len
+// ============================================================================
+//  Parse EXTR
+// ============================================================================
 
-void ParseEXTR() {
+/// @brief Parse the **EXTR** instruction.
+///
+/// **Syntax**:
+/// - `EXTR regR, regB, pos, len`
+/// - `EXTR.A regR, regB, len`
+///
+/// The function:
+/// - Optionally detects the `.A` option modifier.
+/// - Validates and parses `regR` (destination register).
+/// - Validates and parses `regB` (source register).
+/// - Parses `pos` and `len` as integer expressions or values.
+/// - Populates the AST with operand and option nodes.
+/// - Reports detailed errors if tokens are missing or invalid.
+
+void parseEXTR() {
 
     bool was_option = FALSE;
 
@@ -2560,85 +2567,85 @@ void ParseEXTR() {
 
     if (tokTyp == T_DOT) {
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp == T_IDENTIFIER) {
 
             if (DBG_PARSER) {
                 printf("OPT1 %s ", token);
             }
             operandType = OT_NOTHING;
-            ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
-            Add_ASTchild(ASTinstruction, ASTopt1);
+            ASTopt1 = createASTnode(NODE_OPTION, token, 1);
+            addASTchild(ASTinstruction, ASTopt1);
 
             was_option = TRUE;
         }
-        GetNextToken();
+        fetchToken();
     }
 
     // Here should be regR 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         if (DBG_PARSER) {
             printf("regR %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
         strcpy(tokenSave, token);
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regB
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         if (DBG_PARSER) {
             printf("regR %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop2);
+        ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop2);
         strcpy(tokenSave, token);
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
     // Here should be a value
 
-    value = ParseExpression();
-    if (VarType == V_VALUE) {
+    value = parseExpression();
+    if (varType == V_VALUE) {
 
         operandType = OT_VALUE;
-        ASTop3 = Create_ASTnode(NODE_OPERAND, ">", value);
-        Add_ASTchild(ASTinstruction, ASTop3);
+        ASTop3 = createASTnode(NODE_OPERAND, ">", value);
+        addASTchild(ASTinstruction, ASTop3);
         strcpy(tokenSave, token);
     }
 
@@ -2649,19 +2656,19 @@ void ParseEXTR() {
 
         if (tokTyp != T_COMMA) {
             snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
-        GetNextToken();
+        fetchToken();
 
         // Here should be a value
 
-        value = ParseExpression();
-        if (VarType == V_VALUE) {
+        value = parseExpression();
+        if (varType == V_VALUE) {
 
             operandType = OT_VALUE;
-            ASTop4 = Create_ASTnode(NODE_OPERAND, ">", value);
-            Add_ASTchild(ASTinstruction, ASTop4);
+            ASTop4 = createASTnode(NODE_OPERAND, ">", value);
+            addASTchild(ASTinstruction, ASTop4);
             strcpy(tokenSave, token);
         }
 
@@ -2669,120 +2676,150 @@ void ParseEXTR() {
 
 }
 
-/// @par Parse GATE
-///     - OP regR,ofs
+// ============================================================================
+//  Parse GATE
+// ============================================================================
 
-void ParseGATE() {
+/// @brief Parse the **GATE** instruction.
+///
+/// **Syntax**:
+/// - `GATE regR, ofs`
+///
+/// The function:
+/// - Validates and parses `regR` (target register).
+/// - Parses `ofs` as either:
+///   - A numeric constant (possibly negative), or
+///   - A label reference.
+/// - Populates the AST with appropriate operand nodes.
+/// - Reports detailed errors on invalid register names or missing tokens.
+
+void parseGATE() {
 
     // Here should be regR 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         if (DBG_PARSER) {
             printf("regR %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
         strcpy(tokenSave, token);
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
     is_negative = FALSE;
     if (tokTyp == T_MINUS) {
 
         is_negative = TRUE;
-        GetNextToken();
+        fetchToken();
     }
 
     if (tokTyp == T_NUM) {                  // operand is a number
 
-        value = StrToNum(token);
+        value = strToNum(token);
         if (is_negative == TRUE) {
 
             value = 0 - value;
         }
         operandType = OT_VALUE;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
-        Add_ASTchild(ASTinstruction, ASTop2);
+        ASTop2 = createASTnode(NODE_OPERAND, ">", value);
+        addASTchild(ASTinstruction, ASTop2);
     }
     else if (tokTyp == T_IDENTIFIER) {        // operand is a label 
 
         operandType = OT_LABEL;
-        ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop2);
+        ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop2);
     }
 }
 
-/// @par Parse LD, ST
-///     - OP[.M] regR, ofs([regS],regB)
-///     - OP[.M] regR, regA([regS],regB)
+// ============================================================================
+//  Parse LD / ST
+// ============================================================================
 
-void ParseLD_ST() {
+/// @brief Parse **LD** (load) and **ST** (store) instructions.
+///
+/// **Syntax**:
+/// - `OP[.M] regR, ofs([regS], regB)`
+/// - `OP[.M] regR, regA([regS], regB)`
+///
+/// The function:
+/// - Detects the optional `.M` modifier.
+/// - Parses `regR` (destination/source register).
+/// - Handles second operand:
+///   - Either an immediate offset expression, a global/local variable reference, or
+///   - Another register.
+/// - Validates the address form `(regS, regB)` with possible segment register usage.
+/// - Builds AST nodes for operands and options.
+/// - Reports errors if the instruction format is invalid.
+
+void parseLD_ST() {
 
     // Check Option
 
     if (tokTyp == T_DOT) {
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp == T_IDENTIFIER) {
 
             if (DBG_PARSER) {
                 printf("OPT1 %s ", token);
             }
             operandType = OT_NOTHING;
-            ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
-            Add_ASTchild(ASTinstruction, ASTopt1);
+            ASTopt1 = createASTnode(NODE_OPTION, token, 1);
+            addASTchild(ASTinstruction, ASTopt1);
         }
-        GetNextToken();
+        fetchToken();
     }
 
     // Here should be regR 
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         if (DBG_PARSER) {
             printf("regR %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
         strcpy(tokenSave, token);
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
     is_negative = FALSE;
     if (tokTyp == T_MINUS) {
 
         is_negative = TRUE;
-        GetNextToken();
+        fetchToken();
     }
 
     // Either Register
@@ -2790,161 +2827,177 @@ void ParseLD_ST() {
     mode = 0;
 
     if (tokTyp == T_IDENTIFIER) {
-        if (CheckGenReg() == TRUE) {
+        if (checkGenReg() == TRUE) {
             if (DBG_PARSER) {
                 printf("regB %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop2);
+            ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop2);
             mode = 1;
-            GetNextToken();
+            fetchToken();
         }
     }
     if (mode == 0) {
 
-        value = ParseExpression();
+        value = parseExpression();
         strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
         if (lineERR) return;
-        if (VarType == V_VALUE) {
+        if (varType == V_VALUE) {
 
             if (DBG_PARSER) {
                 printf("[%" PRId64 "]", value);
             }
             operandType = OT_VALUE;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
-            Add_ASTchild(ASTinstruction, ASTop2);
+            ASTop2 = createASTnode(NODE_OPERAND, ">", value);
+            addASTchild(ASTinstruction, ASTop2);
         }
         else {
 
             if (DBG_PARSER) {
-                printf("Variable %s global/local %d\n", Variable, VarType);
+                printf("Variable %s global/local %d\n", varName, varType);
             }
             operandType = OT_MEMGLOB;
             mode = 3;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, Variable, value);
-            Add_ASTchild(ASTinstruction, ASTop2);
+            ASTop2 = createASTnode(NODE_OPERAND, varName, value);
+            addASTchild(ASTinstruction, ASTop2);
             return;
         }
     }
 
     if (tokTyp != T_LPAREN) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regB or regS 1-3
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
         if (DBG_PARSER) {
             printf("regB %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop3);
+        ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop3);
     }
-    else if (CheckSegReg() == TRUE) {
+    else if (checkSegReg() == TRUE) {
         if (DBG_PARSER) {
             printf("regB %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop3);
+        ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop3);
         // Here should be a comma
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp != T_COMMA) {
             snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
-        GetNextToken();
-        if (CheckGenReg() == TRUE) {
+        fetchToken();
+        if (checkGenReg() == TRUE) {
             if (DBG_PARSER) {
                 printf("regB %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop4 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop4);
+            ASTop4 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop4);
         }
         else {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
     // Here should be a RPAREN
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_RPAREN) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 }
 
-/// @par Parse LDA, STA
-///     - OP[.M] regR, ofs(regB)
-///     - OP[.M] regR, regA(regB)
+// ============================================================================
+//  Parse LDA / STA
+// ============================================================================
 
-void ParseLDA_STA() {
+/// @brief Parse **LDA** (load address) and **STA** (store address) instructions.
+///
+/// **Syntax**:
+/// - `OP[.M] regR, ofs(regB)`
+/// - `OP[.M] regR, regA(regB)`
+///
+/// The function:
+/// - Detects the optional `.M` modifier.
+/// - Parses `regR` (destination/source register).
+/// - Parses second operand:
+///   - Either an offset expression, variable reference, or
+///   - Another register.
+/// - Validates the address form `(regB)` used in memory addressing.
+/// - Builds AST nodes for operands and options.
+/// - Provides detailed error messages on invalid registers or syntax issues.
+
+void parseLDA_STA() {
 
     // Check Option
 
     if (tokTyp == T_DOT) {
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp == T_IDENTIFIER) {
 
             if (DBG_PARSER) {
                 printf("OPT1 %s ", token);
             }
             operandType = OT_NOTHING;
-            ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
-            Add_ASTchild(ASTinstruction, ASTopt1);
+            ASTopt1 = createASTnode(NODE_OPTION, token, 1);
+            addASTchild(ASTinstruction, ASTopt1);
         }
-        GetNextToken();
+        fetchToken();
     }
 
     // Here should be regR 
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         if (DBG_PARSER) {
             printf("regR %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
         strcpy(tokenSave, token);
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
     is_negative = FALSE;
     if (tokTyp == T_MINUS) {
 
         is_negative = TRUE;
-        GetNextToken();
+        fetchToken();
     }
 
     // Either Register
@@ -2952,221 +3005,243 @@ void ParseLDA_STA() {
     mode = 0;
 
     if (tokTyp == T_IDENTIFIER) {
-        if (CheckGenReg() == TRUE) {
+        if (checkGenReg() == TRUE) {
             if (DBG_PARSER) {
                 printf("regB %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop2);
+            ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop2);
             mode = 1;
-            GetNextToken();
+            fetchToken();
         }
     }
     if (mode == 0) {
 
-        value = ParseExpression();
+        value = parseExpression();
         strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
         if (lineERR) return;
-        if (VarType == V_VALUE) {
+        if (varType == V_VALUE) {
 
             if (DBG_PARSER) {
-                printf("[%d]", value);
+                printf("[%d]", (int)value);
             }
             operandType = OT_VALUE;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
-            Add_ASTchild(ASTinstruction, ASTop2);
+            ASTop2 = createASTnode(NODE_OPERAND, ">", value);
+            addASTchild(ASTinstruction, ASTop2);
         }
         else {
 
             if (DBG_PARSER) {
-                printf("Variable %s global/local %d\n", Variable, VarType);
+                printf("Variable %s global/local %d\n", varName, varType);
             }
             operandType = OT_MEMGLOB;
             mode = 3;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, Variable, value);
-            Add_ASTchild(ASTinstruction, ASTop2);
+            ASTop2 = createASTnode(NODE_OPERAND, varName, value);
+            addASTchild(ASTinstruction, ASTop2);
             return;
         }
     }
 
     if (tokTyp != T_LPAREN) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regB or regS 1-3
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
         if (DBG_PARSER) {
             printf("regB %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop3);
+        ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop3);
     }
     else {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
     // Here should be a RPAREN
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_RPAREN) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 }
 
 // -----------------------------------------------------------------------
 
-/// @par Parse CMR
-/// CMR.<opt3> regR, regA, regB
-///  EQ ( b == 0 ) 												
-///  LT(b < 0, Signed)
-///  NE(b != 0)
-///  LE(b <= 0, Signed)
-///  GT(b > 0, Signed)
-///  GE(b >= 0, Signed)
-///  HI(b > 0, Unsigned)
-///  HE(b >= 0, Unsigned)
+// ============================================================================
+//  Parse CMR
+// ============================================================================
 
-void ParseCMR() {
+/// @brief Parse the `CMR` instruction.
+/// @details
+/// Syntax:
+///   - `CMR.<opt3> regR, regA, regB`
+///
+/// Supported conditions for `<opt3>`:
+///   - EQ : b == 0  
+///   - LT : b < 0 (signed)  
+///   - NE : b != 0  
+///   - LE : b <= 0 (signed)  
+///   - GT : b > 0 (signed)  
+///   - GE : b >= 0 (signed)  
+///   - HI : b > 0 (unsigned)  
+///   - HE : b >= 0 (unsigned)  
+///
+/// The function checks for an optional condition code, followed by three
+/// registers (`regR`, `regA`, `regB`). It adds AST nodes for each operand.
+
+void parseCMR() {
 
 
     // check for option
 
     if (tokTyp == T_DOT) {
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp == T_IDENTIFIER) {
 
             if (DBG_PARSER) {
                 printf("OPT1 %s ", token);
             }
             operandType = OT_NOTHING;
-            ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
-            Add_ASTchild(ASTinstruction, ASTopt1);
+            ASTopt1 = createASTnode(NODE_OPTION, token, 1);
+            addASTchild(ASTinstruction, ASTopt1);
         }
-        GetNextToken();
+        fetchToken();
     }
 
     // Here should be regR 
 
     if (tokTyp == T_IDENTIFIER) {
 
-        if (CheckGenReg() == TRUE) {
+        if (checkGenReg() == TRUE) {
 
             if (DBG_PARSER) {
                 printf("regR %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop1);
+            ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop1);
             strcpy(tokenSave, token);
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regA
 
     if (tokTyp == T_IDENTIFIER) {
 
-        if (CheckGenReg() == TRUE) {
+        if (checkGenReg() == TRUE) {
 
             if (DBG_PARSER) {
                 printf("regA %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop2);
+            ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop2);
             strcpy(tokenSave, token);
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
     // Here should be regB
 
     if (tokTyp == T_IDENTIFIER) {
 
-        if (CheckGenReg() == TRUE) {
+        if (checkGenReg() == TRUE) {
 
             if (DBG_PARSER) {
                 printf("regB %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop3);
+            ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop3);
             strcpy(tokenSave, token);
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
 
 }
 
-/// @par Parse DEP
-/// DEP.[Z] regR, regB, pos, len
-/// DEP.[A[Z]] regR, regB, len                  mode 1
-/// DEP.[I[Z]] regR, value, pos, len            mode 2
-/// DEP.[IA[Z]] regR, value, len                mode 3
-/// 
-void ParseDEP() {
+// ============================================================================
+//  Parse DEP
+// ============================================================================
+
+/// @brief Parse the `DEP` instruction with different addressing modes.
+/// @details
+/// Syntax options:
+///   - `DEP.[Z] regR, regB, pos, len` — default mode  
+///   - `DEP.[A[Z]] regR, regB, len` — mode 1  
+///   - `DEP.[I[Z]] regR, value, pos, len` — mode 2  
+///   - `DEP.[IA[Z]] regR, value, len` — mode 3  
+///
+/// Behavior:
+///   - Optional suffixes `A`, `I`, and `Z` modify the addressing mode.  
+///   - Depending on the mode, operands may be registers or immediate values.  
+///   - The function validates tokens, parses values with `parseExpression()`,
+///     and attaches AST nodes for operands and the final addressing mode.
+void parseDEP() {
 
     // check for option
 
@@ -3174,37 +3249,27 @@ void ParseDEP() {
 
     if (tokTyp == T_DOT) {
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp == T_IDENTIFIER) {
 
             if (DBG_PARSER) {
                 printf("OPT1 %s ", token);
             }
             operandType = OT_NOTHING;
-            ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
-            Add_ASTchild(ASTinstruction, ASTopt1);
+            ASTopt1 = createASTnode(NODE_OPTION, token, 1);
+            addASTchild(ASTinstruction, ASTopt1);
 
-            for (j = 0; j < strlen(token); j++) {
+            for (int j = 0; j < strlen(token); j++) {
 
                 switch (token[j]) {
 
-                case 'A':
-
-                    mode = mode + 1;
-                    break;
-
-                case 'I':
-
-                    mode = mode + 2;
-                    break;
-
-                case 'Z':
-                    bool Z = TRUE;
-                    break;
+                case 'A':   mode = mode + 1; break;
+                case 'I':   mode = mode + 2; break;
+                case 'Z':   bool Z = TRUE; break;
                 }
             }
         }
-        GetNextToken();
+        fetchToken();
     }   
 
 
@@ -3213,39 +3278,39 @@ void ParseDEP() {
 
     if (tokTyp == T_IDENTIFIER) {
 
-        if (CheckGenReg() == TRUE) {
+        if (checkGenReg() == TRUE) {
 
             if (DBG_PARSER) {
                 printf("regR %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop1);
+            ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop1);
             strcpy(tokenSave, token);
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     if (mode == 0) {
 
@@ -3253,48 +3318,48 @@ void ParseDEP() {
 
         if (tokTyp == T_IDENTIFIER) {
 
-            if (CheckGenReg() == TRUE) {
+            if (checkGenReg() == TRUE) {
 
                 if (DBG_PARSER) {
                     printf("regR %s ", token);
                 }
                 operandType = OT_REGISTER;
-                ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-                Add_ASTchild(ASTinstruction, ASTop2);
+                ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+                addASTchild(ASTinstruction, ASTop2);
                 strcpy(tokenSave, token);
             }
             else
             {
                 snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-                ProcessError(errmsg);
+                processError(errmsg);
                 return;
             }
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
 
         // Here should be a comma
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp != T_COMMA) {
             snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
-        GetNextToken();
+        fetchToken();
 
         // Here should be a value
 
-        value = ParseExpression();
-        if (VarType == V_VALUE) {
+        value = parseExpression();
+        if (varType == V_VALUE) {
 
             operandType = OT_VALUE;
-            ASTop3 = Create_ASTnode(NODE_OPERAND, ">", value);
-            Add_ASTchild(ASTinstruction, ASTop3);
+            ASTop3 = createASTnode(NODE_OPERAND, ">", value);
+            addASTchild(ASTinstruction, ASTop3);
             strcpy(tokenSave, token);
         }
 
@@ -3303,19 +3368,19 @@ void ParseDEP() {
 
         if (tokTyp != T_COMMA) {
             snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
-        GetNextToken();
+        fetchToken();
 
         // Here should be a value
 
-        value = ParseExpression();
-        if (VarType == V_VALUE) {
+        value = parseExpression();
+        if (varType == V_VALUE) {
 
             operandType = OT_VALUE;
-            ASTop4 = Create_ASTnode(NODE_OPERAND, ">", value);
-            Add_ASTchild(ASTinstruction, ASTop4);
+            ASTop4 = createASTnode(NODE_OPERAND, ">", value);
+            addASTchild(ASTinstruction, ASTop4);
             strcpy(tokenSave, token);
         }
 
@@ -3327,48 +3392,48 @@ void ParseDEP() {
 
         if (tokTyp == T_IDENTIFIER) {
 
-            if (CheckGenReg() == TRUE) {
+            if (checkGenReg() == TRUE) {
 
                 if (DBG_PARSER) {
                     printf("regR %s ", token);
                 }
                 operandType = OT_REGISTER;
-                ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-                Add_ASTchild(ASTinstruction, ASTop2);
+                ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+                addASTchild(ASTinstruction, ASTop2);
                 strcpy(tokenSave, token);
             }
             else
             {
                 snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-                ProcessError(errmsg);
+                processError(errmsg);
                 return;
             }
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
 
         // Here should be a comma
 
-        GetNextToken();
+        fetchToken();
         if (tokTyp != T_COMMA) {
             snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
-        GetNextToken();
+        fetchToken();
 
         // Here should be a value
 
-        value = ParseExpression();
-        if (VarType == V_VALUE) {
+        value = parseExpression();
+        if (varType == V_VALUE) {
 
             operandType = OT_VALUE;
-            ASTop3 = Create_ASTnode(NODE_OPERAND, ">", value);
-            Add_ASTchild(ASTinstruction, ASTop3);
+            ASTop3 = createASTnode(NODE_OPERAND, ">", value);
+            addASTchild(ASTinstruction, ASTop3);
             strcpy(tokenSave, token);
         }
 
@@ -3377,12 +3442,12 @@ void ParseDEP() {
 
         // Here should be a value
 
-        value = ParseExpression();
-        if (VarType == V_VALUE) {
+        value = parseExpression();
+        if (varType == V_VALUE) {
 
             operandType = OT_VALUE;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
-            Add_ASTchild(ASTinstruction, ASTop2);
+            ASTop2 = createASTnode(NODE_OPERAND, ">", value);
+            addASTchild(ASTinstruction, ASTop2);
             strcpy(tokenSave, token);
         }
 
@@ -3390,19 +3455,19 @@ void ParseDEP() {
 
         if (tokTyp != T_COMMA) {
             snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
-        GetNextToken();
+        fetchToken();
 
         // Here should be a value
 
-        value = ParseExpression();
-        if (VarType == V_VALUE) {
+        value = parseExpression();
+        if (varType == V_VALUE) {
 
             operandType = OT_VALUE;
-            ASTop3 = Create_ASTnode(NODE_OPERAND, ">", value);
-            Add_ASTchild(ASTinstruction, ASTop3);
+            ASTop3 = createASTnode(NODE_OPERAND, ">", value);
+            addASTchild(ASTinstruction, ASTop3);
             strcpy(tokenSave, token);
         }
 
@@ -3411,19 +3476,19 @@ void ParseDEP() {
 
         if (tokTyp != T_COMMA) {
             snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
-        GetNextToken();
+        fetchToken();
 
         // Here should be a value
 
-        value = ParseExpression();
-        if (VarType == V_VALUE) {
+        value = parseExpression();
+        if (varType == V_VALUE) {
 
             operandType = OT_VALUE;
-            ASTop4 = Create_ASTnode(NODE_OPERAND, ">", value);
-            Add_ASTchild(ASTinstruction, ASTop4);
+            ASTop4 = createASTnode(NODE_OPERAND, ">", value);
+            addASTchild(ASTinstruction, ASTop4);
             strcpy(tokenSave, token);
         }
     }
@@ -3431,12 +3496,12 @@ void ParseDEP() {
 
         // Here should be a value
 
-        value = ParseExpression();
-        if (VarType == V_VALUE) {
+        value = parseExpression();
+        if (varType == V_VALUE) {
 
             operandType = OT_VALUE;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
-            Add_ASTchild(ASTinstruction, ASTop2);
+            ASTop2 = createASTnode(NODE_OPERAND, ">", value);
+            addASTchild(ASTinstruction, ASTop2);
             strcpy(tokenSave, token);
         }
 
@@ -3444,953 +3509,845 @@ void ParseDEP() {
 
         if (tokTyp != T_COMMA) {
             snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
-        GetNextToken();
+        fetchToken();
 
         // Here should be a value
 
-        value = ParseExpression();
-        if (VarType == V_VALUE) {
+        value = parseExpression();
+        if (varType == V_VALUE) {
 
             operandType = OT_VALUE;
-            ASTop3 = Create_ASTnode(NODE_OPERAND, ">", value);
-            Add_ASTchild(ASTinstruction, ASTop3);
+            ASTop3 = createASTnode(NODE_OPERAND, ">", value);
+            addASTchild(ASTinstruction, ASTop3);
             strcpy(tokenSave, token);
         }
     }
     
     operandType = OT_NOTHING;
-    ASTmode = Create_ASTnode(NODE_MODE, "", mode);
-    Add_ASTchild(ASTinstruction, ASTmode);
+    ASTmode = createASTnode(NODE_MODE, "", mode);
+    addASTchild(ASTinstruction, ASTmode);
 }
 
-/// @par Parse DIAG
-///     DIAG regR,regA,regB,info
+// ============================================================================
+//  Parse DIAG
+// ============================================================================
 
-void ParseDIAG() {
+/// @brief Parse the `DIAG` instruction.
+/// @details
+/// Syntax:
+///   - `DIAG regR, regA, regB, info`
+///
+/// Description:
+///   - `regR`, `regA`, and `regB` must be valid general-purpose registers.  
+///   - `info` is an immediate value (parsed with `parseExpression()`).  
+///   - The instruction is primarily used for diagnostics or debugging output.
+///
+/// The function enforces the required operand sequence and builds AST nodes
+/// for each operand.
+
+void parseDIAG() {
 
     // Here should be regR 
 
-    if (CheckGenReg() == TRUE) {
+    if (checkGenReg() == TRUE) {
 
         if (DBG_PARSER) {
             printf("regR %s ", token);
         }
         operandType = OT_REGISTER;
-        ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop1);
+        ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop1);
         strcpy(tokenSave, token);
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regA
 
     if (tokTyp == T_IDENTIFIER) {
 
-        if (CheckGenReg() == TRUE) {
+        if (checkGenReg() == TRUE) {
 
             if (DBG_PARSER) {
                 printf("regA %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop2);
+            ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop2);
             strcpy(tokenSave, token);
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
+    fetchToken();
 
     // Here should be regB
 
     if (tokTyp == T_IDENTIFIER) {
 
-        if (CheckGenReg() == TRUE) {
+        if (checkGenReg() == TRUE) {
 
             if (DBG_PARSER) {
                 printf("regB %s ", token);
             }
             operandType = OT_REGISTER;
-            ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop3);
+            ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop3);
             strcpy(tokenSave, token);
         }
         else
         {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
     else
     {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
     // Here should be a comma
 
-    GetNextToken();
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
-    GetNextToken();
-    value = ParseExpression();
-    if (VarType == V_VALUE) {
+    fetchToken();
+    value = parseExpression();
+    if (varType == V_VALUE) {
 
         operandType = OT_VALUE;
-        ASTop4 = Create_ASTnode(NODE_OPERAND, ">", value);
-        Add_ASTchild(ASTinstruction, ASTop4);
+        ASTop4 = createASTnode(NODE_OPERAND, ">", value);
+        addASTchild(ASTinstruction, ASTop4);
         strcpy(tokenSave, token);
     }
 }
 
 // -----------------------------------------------------------------------
 
-/// @par Parse ADD,ADC,AND,CMP,CMPU,OR,SBC,SUB,XOR
-/// OP<.XX> regR, value (17bitS)          ->  mode 0
-/// OP<.XX> regR, regA, regB              ->  mode 1
-/// OP[W | H | B]<.XX> regR, regA(regB)   ->  mode 2
-/// OP[W | H | B]<.XX> regR, ofs(regB)    ->  mode 3
+// =====================================================================================
+//  Parse Arithmetic/Logic Instructions
+// =====================================================================================
 
-void ParseModInstr() {
+/// @brief Parses arithmetic and logical instructions with multiple addressing modes.
+///
+/// Supported instructions include:
+/// - ADD, ADC, AND, CMP, CMPU, OR, SBC, SUB, XOR
+///
+/// ### Supported addressing modes:
+/// - **Mode 0**: `OP<.XX> regR, value (17bitS)`  
+/// - **Mode 1**: `OP<.XX> regR, regA, regB`  
+/// - **Mode 2**: `OP[W | H | B]<.XX> regR, regA(regB)`  
+/// - **Mode 3**: `OP[W | H | B]<.XX> regR, ofs(regB)`  
+///
+/// The parser extracts options, validates registers and operands, and
+/// attaches them to the AST. Invalid syntax triggers error reporting.
+
+void parseModInstr() {
 
     char        option[MAX_WORD_LENGTH];        // option value 
 
-    // check for 1. option
-
-    if (tokTyp == T_DOT) {                                  
-
-        GetNextToken();
+    // ----------------------------------------------------
+    // Step 1: Parse first optional modifier (e.g., .XX)
+    // ----------------------------------------------------
+    if (tokTyp == T_DOT) {
+        fetchToken();
         if (tokTyp == T_IDENTIFIER) {
-
-            if (DBG_PARSER) {
-                printf("OPT1 %s ", token);
-            }
+            if (DBG_PARSER) printf("OPT1 %s ", token);
             operandType = OT_NOTHING;
-            ASTopt1 = Create_ASTnode(NODE_OPTION, token, 1);
-            Add_ASTchild(ASTinstruction, ASTopt1);
+            ASTopt1 = createASTnode(NODE_OPTION, token, 1);
+            addASTchild(ASTinstruction, ASTopt1);
         }
-        GetNextToken();
+        fetchToken();
     }
 
-    // check for 2. option
-
-    if (tokTyp == T_DOT) {                                  
-
-
-        GetNextToken();
-
+    // ----------------------------------------------------
+    // Step 2: Parse second optional modifier
+    // ----------------------------------------------------
+    if (tokTyp == T_DOT) {
+        fetchToken();
         if (tokTyp == T_IDENTIFIER) {
-
-            if (DBG_PARSER) {
-                printf("OPT2 %s ", token);
-            }
+            if (DBG_PARSER) printf("OPT2 %s ", token);
             operandType = OT_NOTHING;
-            ASTopt2 = Create_ASTnode(NODE_OPTION, token, 2);
-            Add_ASTchild(ASTinstruction, ASTopt2);
+            ASTopt2 = createASTnode(NODE_OPTION, token, 2);
+            addASTchild(ASTinstruction, ASTopt2);
         }
-        GetNextToken();
+        fetchToken();
     }
 
-    // Here should be regR 
-
+    // ----------------------------------------------------
+    // Step 3: Parse destination register (regR)
+    // ----------------------------------------------------
     if (tokTyp == T_IDENTIFIER) {
-
-        if (CheckGenReg() == TRUE) {
-
-            if (DBG_PARSER) {
-                printf("regR %s ", token);
-            }
+        if (checkGenReg() == TRUE) {
+            if (DBG_PARSER) printf("regR %s ", token);
             operandType = OT_REGISTER;
-            ASTop1 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop1);
+            ASTop1 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop1);
             strcpy(tokenSave, token);
         }
-        else
-        {
+        else {
             snprintf(errmsg, sizeof(errmsg), "Invalid register name %s ", token);
-            ProcessError(errmsg);
+            processError(errmsg);
             return;
         }
     }
-    else
-    {
+    else {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
-    // Here should be a comma
 
-    GetNextToken();
+    // ----------------------------------------------------
+    // Step 4: Expect a comma after regR
+    // ----------------------------------------------------
+    fetchToken();
     if (tokTyp != T_COMMA) {
         snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
+    fetchToken();
 
-    // this is the common area for all modes
-
-    GetNextToken();
-
+    // ----------------------------------------------------
+        // Step 5: Parse operand (regA, immediate, or memory)
+        // ----------------------------------------------------
     mode = 0;
     is_negative = FALSE;
-    
+
     if (tokTyp == T_MINUS) {
-
         is_negative = TRUE;
-        GetNextToken();
+        fetchToken();
     }
 
+    // --- Operand could be a register (regA) ---
+    if (tokTyp == T_IDENTIFIER && checkGenReg() == TRUE) {
+        if (DBG_PARSER) printf("regA %s ", token);
+        operandType = OT_REGISTER;
+        ASTop2 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop2);
 
-    if (tokTyp == T_IDENTIFIER) {
+        fetchToken();
+        if (tokTyp == T_EOL) {  // Mode 1 with implicit regB = regR
+            mode = 1;
+            if (DBG_PARSER) printf("M-%d\n", mode);
+            checkOpcodeMode();
 
-        if (CheckGenReg() == TRUE) {
-            if (DBG_PARSER) {
-                printf("regA %s ", token);
-            }
-            operandType = OT_REGISTER;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, token, 0);
-            Add_ASTchild(ASTinstruction, ASTop2);
+            strcpy(token, tokenSave);
+            ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+            addASTchild(ASTinstruction, ASTop3);
 
-            GetNextToken();
-            if (tokTyp == T_EOL) {
-                mode = 1;
-                if (DBG_PARSER) {
-                    printf("M-%d\n", mode);
-                }
-
-                CheckOpcodeMode();
-
-                strcpy(token, tokenSave);
-                operandType = OT_REGISTER;
-                ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-                Add_ASTchild(ASTinstruction, ASTop3);            
-                operandType = OT_NOTHING;
-                ASTmode = Create_ASTnode(NODE_MODE, "", mode);
-                Add_ASTchild(ASTinstruction, ASTmode);
-                return;
-            }
-            else if (tokTyp == T_COMMA) {
-                mode = 1;
-            }
-            else if (tokTyp == T_LPAREN) {
-                mode = 2;
-            }
-        }
-    }
-    if (mode == 0) {
-
-        value = ParseExpression();
-        strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
-        if (lineERR) return;
-        if (VarType == V_VALUE) {
-
-            if (DBG_PARSER) {
-                printf("[%" PRId64 "]", value);
-            }
-            operandType = OT_VALUE;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, ">", value);
-            Add_ASTchild(ASTinstruction, ASTop2);
-        }
-        else {
-
-            if (DBG_PARSER) {
-                printf("Variable %s global/local %d\n",Variable,VarType);
-            }
-            operandType = OT_MEMGLOB;
-            mode = 3;
-            ASTop2 = Create_ASTnode(NODE_OPERAND, Variable, value);
-            Add_ASTchild(ASTinstruction, ASTop2);
-            operandType = OT_NOTHING;
-            ASTmode = Create_ASTnode(NODE_MODE, "", mode);
-            Add_ASTchild(ASTinstruction, ASTmode);
+            ASTmode = createASTnode(NODE_MODE, "", mode);
+            addASTchild(ASTinstruction, ASTmode);
             return;
         }
-        if (tokTyp == T_EOL) {
+        else if (tokTyp == T_COMMA) {
+            mode = 1;
+        }
+        else if (tokTyp == T_LPAREN) {
+            mode = 2;
+        }
+    }
 
+    // --- Operand could be an immediate or memory reference ---
+    if (mode == 0) {
+        value = parseExpression();
+        strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
+        if (lineERR) return;
+
+        if (varType == V_VALUE) {
+            if (DBG_PARSER) printf("[%" PRId64 "]", value);
+            operandType = OT_VALUE;
+            ASTop2 = createASTnode(NODE_OPERAND, ">", value);
+            addASTchild(ASTinstruction, ASTop2);
+        }
+        else {
+            if (DBG_PARSER) printf("Variable %s global/local %d\n", varName, varType);
+            operandType = OT_MEMGLOB;
+            mode = 3;
+            ASTop2 = createASTnode(NODE_OPERAND, varName, value);
+            addASTchild(ASTinstruction, ASTop2);
+
+            ASTmode = createASTnode(NODE_MODE, "", mode);
+            addASTchild(ASTinstruction, ASTmode);
+            return;
+        }
+
+        if (tokTyp == T_EOL) {
             mode = 0;
-            if (DBG_PARSER) {
-                printf("M-%d\n", mode);
-            }
-            CheckOpcodeMode();
-            if (lineERR == TRUE) {
- //               return;
-            }
-            operandType = OT_NOTHING;
-            ASTmode = Create_ASTnode(NODE_MODE, "", mode);
-            Add_ASTchild(ASTinstruction, ASTmode);
-        
+            if (DBG_PARSER) printf("M-%d\n", mode);
+            checkOpcodeMode();
+            ASTmode = createASTnode(NODE_MODE, "", mode);
+            addASTchild(ASTinstruction, ASTmode);
             return;
         }
         else if (tokTyp == T_LPAREN) {
-
             mode = 3;
         }
     }
 
-    GetNextToken();
+    // ----------------------------------------------------
+    // Step 6: Parse regB inside parentheses (if present)
+    // ----------------------------------------------------
+    fetchToken();
     if (tokTyp == T_EOL) {
-
         snprintf(errmsg, sizeof(errmsg), "Unexpected EOL ");
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
     else if (tokTyp == T_RPAREN) {
-
         snprintf(errmsg, sizeof(errmsg), "Missing Argument between brackets ");
-        ProcessError(errmsg);
+        processError(errmsg);
         return;
     }
 
-    if (CheckGenReg() == TRUE) {
-        if (DBG_PARSER) {
-            printf("regB %s ", token);
-        }
-        operandType = OT_REGISTER;
-        ASTop3 = Create_ASTnode(NODE_OPERAND, token, 0);
-        Add_ASTchild(ASTinstruction, ASTop3);
+    if (checkGenReg() == TRUE) {
+        if (DBG_PARSER) printf("regB %s ", token);
+        ASTop3 = createASTnode(NODE_OPERAND, token, 0);
+        addASTchild(ASTinstruction, ASTop3);
 
         if (mode == 1) {
-            GetNextToken();
+            fetchToken();
             if (tokTyp != T_EOL) {
                 snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-                ProcessError(errmsg);
+                processError(errmsg);
                 return;
             }
         }
         else if (mode == 2 || mode == 3) {
-            GetNextToken();
+            fetchToken();
             if (tokTyp != T_RPAREN) {
                 snprintf(errmsg, sizeof(errmsg), "Unexpected token %s ", token);
-                ProcessError(errmsg);
+                processError(errmsg);
                 return;
             }
         }
-        if (DBG_PARSER) {
-            printf("M-%d\n", mode);
-        }
-        CheckOpcodeMode();
-        if (lineERR) {
- //           return;
-        }
-        
-        ASTmode = Create_ASTnode(NODE_MODE, "", mode);
-        Add_ASTchild(ASTinstruction, ASTmode);
-        return;
 
+        if (DBG_PARSER) printf("M-%d\n", mode);
+        checkOpcodeMode();
+
+        ASTmode = createASTnode(NODE_MODE, "", mode);
+        addASTchild(ASTinstruction, ASTmode);
+        return;
     }
     return;
+}
 
-} // END ADD,SUB,.....
+// =====================================================================================
+//  Parse General Instruction Dispatcher
+// =====================================================================================
 
-// -------------------------------------------------------------------------------- 
-//          Parser ProcessInstruction
-// --------------------------------------------------------------------------------
-
-void ParseInstruction() {
+/// @brief Main dispatcher for parsing instructions.
+///
+/// This function:
+/// - Validates the opcode against the opcode table.
+/// - Builds the AST nodes for instructions, labels, and operations.
+/// - Routes parsing to the appropriate specialized function depending on the
+///   instruction type (e.g., `parseModInstr()`, `parseEXTR()`, `parseLD_ST()`, etc.).
+/// - Handles symbol table updates for labels.
+/// - Ensures proper error handling and recovery on invalid instructions.
+///
+/// @note Updates `codeAdr` to advance the program counter by 4 bytes after
+///       successful parsing.
+void parseInstruction() {
 
     int i = 0;
     lineERR = FALSE;
-    VarType = V_VALUE;
+    varType = V_VALUE;
 
     strcpy(opCode, tokenSave);
-    StrToUpper(opCode);
-    
-    if (DBG_PARSER) {
+    strToUpper(opCode);
+    if (DBG_PARSER) printf("%03d I %s ", lineNr, opCode);
 
-        printf("%03d I %s ", lineNr, opCode);
-    }
-
-    int num_Opcode = (sizeof(opCodeTab) / sizeof(opCodeTab[0]));
+    // ----------------------------------------------------
+    // Step 1: Validate opcode against table
+    // ----------------------------------------------------
+    int num_Opcode = sizeof(opCodeTab) / sizeof(opCodeTab[0]);
     bool opCode_found = FALSE;
-
     for (i = 0; i < num_Opcode; i++) {
-
-        if (strcmp(opCode, opCodeTab[i].mnemonic) == 0) {		// opCode found
-
+        if (strcmp(opCode, opCodeTab[i].mnemonic) == 0) {
             opCode_found = TRUE;
             break;
         }
     }
-    if (opCode_found == FALSE) {
-
+    if (!opCode_found) {
         snprintf(errmsg, sizeof(errmsg), "Invalid Opcode %s ", opCode);
-        ProcessError(errmsg);
-        SkipToEOL();
-        return; 
-    }
-
-    binInstr = opCodeTab[i].binInstr;
-    OpType = opCodeTab[i].instrType;
-
-    // build AST NODE INSTRUCTION
-
-    operandType = 0;
-    ASTinstruction = Create_ASTnode(NODE_INSTRUCTION, "", binInstr);
-    Add_ASTchild(ASTprogram, ASTinstruction);
-
-    if (strcmp(func_entry, "") != 0) {
-
-        // build AST NODE LABEL
-
-        ASTlabel = Create_ASTnode(NODE_LABEL, func_entry, 0);
-        Add_ASTchild(ASTinstruction, ASTlabel);
-        strcpy(func_entry, "");
-    }
-    if (strcmp(label, "") != 0) {
-
-        symFound = FALSE;
-        searchScopeLevel = currentScopeLevel;
-        SearchSymLevel(scopeTab[searchScopeLevel], label, 0);
-
-        if (symFound == FALSE) {
-
-            // insert Label in SYMBOLTABLE
-
-            strcpy(dirCode, "LABEL");
-            operandType = OT_LABEL;
-            VarType = V_VALUE;
-            directive = Create_SYMnode(SCOPE_DIRECT, label, dirCode, "", lineNr);
-            Add_SYMchild(scopeTab[currentScopeLevel], directive);
-        }
-        else
-        {
-            snprintf(errmsg, sizeof(errmsg), "Label %s already defined ", label);
-            ProcessError(errmsg);
-            strcpy(label, "");
-            SkipToEOL();
-            return;
-        }
-
-        ASTlabel = Create_ASTnode(NODE_LABEL, label, 0);
-        Add_ASTchild(ASTinstruction, ASTlabel);
-        strcpy(label, "");
-    }
-
-    // build AST NODE OPERATION
-
-    operandType = 0;
-    ASToperation = Create_ASTnode(NODE_OPERATION, opCode, OpType);
-    Add_ASTchild(ASTinstruction, ASToperation);
-
-    switch (OpType) {
-
-    case ADD:
-    case ADC:
-    case SUB:
-    case SBC:
-    case AND:
-    case OR:
-    case XOR:
-    case CMP:
-    case CMPU:      
-
-        ParseModInstr(); 
-        break;
-    
-    case ADDIL:
-    case LDIL:
-
-        ParseADDIL_LDIL();
-        break;
-
-    case B:
-
-        ParseB();
-        break;
-
-    case GATE:
-
-        ParseGATE();
-        break;
-
-    case BR:
-    case BV:
-
-        ParseBR_BV();
-        break;
-
-    case CBR:
-    case CBRU:
-
-        ParseCBR_CBRU();
-        break;
-
-    case BVE:
-
-        ParseBVE();
-        break;
-
-    case EXTR:
-
-        ParseEXTR();
-        break;
-
-    case DEP:
-
-        ParseDEP();
-        break;
-
-    case LDR:
-    case STC:
-
-        ParseLDR_STC();
-        break;
-
-    case BE:
-
-        ParseBE();
-        break;
-
-    case BRK:
-
-        ParseBRK();
-        break;
-
-    case DSR:
-
-        ParseDSR();
-        break;
-
-    case SHLA:
-
-        ParseSHLA();
-        break;
-
-    case PCA:
-    case PTLB:
-
-        ParsePCA_PTLB();
-        break;
-
-    case CMR:
-
-        ParseCMR();
-        break;
-
-    case DIAG:
-
-        ParseDIAG();
-        break;
-
-    case ITLB:
-
-        ParseITLB();
-        break;
-
-    case LDO:
-
-        ParseLDO();
-        break;
-
-    case LSID:
-
-        ParseLSID();
-        break;
-
-    case PRB:
-
-        ParsePRB();
-        break;
-
-    case LDPA:
-
-        ParseLDPA();
-        break;
-
-    case MR:
-
-        ParseMR();
-        break;
-
-    case MST:
-
-        ParseMST();
-        break;
-
-    case RFI:
-
-        break;
-
-    case LD:
-    case ST:
-
-        ParseLD_ST();
-        break;
-
-    case LDA:
-    case STA:
-
-        ParseLDA_STA();
-        break;
-
-    default: 
-        printf("not yet implemented\n");
-        break;
-
-    }
-    if (lineERR) {
-        SkipToEOL();
+        processError(errmsg);
+        skipToEOL();
         return;
     }
 
-    codeAdr = codeAdr + 4;
+    binInstr = opCodeTab[i].binInstr;
+    opInstrType = opCodeTab[i].instrType;
 
-    SkipToEOL();
+    // ----------------------------------------------------
+    // Step 2: Build AST nodes for instruction and labels
+    // ----------------------------------------------------
+    ASTinstruction = createASTnode(NODE_INSTRUCTION, "", binInstr);
+    addASTchild(ASTprogram, ASTinstruction);
+
+    if (strcmp(func_entry, "") != 0) {
+        ASTlabel = createASTnode(NODE_LABEL, func_entry, 0);
+        addASTchild(ASTinstruction, ASTlabel);
+        strcpy(func_entry, "");
+    }
+    if (strcmp(label, "") != 0) {
+        symFound = FALSE;
+        searchScopeLevel = currentScopeLevel;
+        searchSymLevel(scopeTab[searchScopeLevel], label, 0);
+
+        if (!symFound) {
+            strcpy(dirCode, "LABEL");
+            directive = createSYMnode(SCOPE_DIRECT, label, dirCode, "", lineNr);
+            addSYMchild(scopeTab[currentScopeLevel], directive);
+        }
+        else {
+            snprintf(errmsg, sizeof(errmsg), "Label %s already defined ", label);
+            processError(errmsg);
+            strcpy(label, "");
+            skipToEOL();
+            return;
+        }
+        ASTlabel = createASTnode(NODE_LABEL, label, 0);
+        addASTchild(ASTinstruction, ASTlabel);
+        strcpy(label, "");
+    }
+
+    // ----------------------------------------------------
+    // Step 3: Build AST node for operation
+    // ----------------------------------------------------
+    ASToperation = createASTnode(NODE_OPERATION, opCode, opInstrType);
+    addASTchild(ASTinstruction, ASToperation);
+
+    // ----------------------------------------------------
+    // Step 4: Dispatch to specific parser based on instruction type
+    // ----------------------------------------------------
+    switch (opInstrType) {
+    case ADD: case ADC: case SUB: case SBC:
+    case AND: case OR:  case XOR: case CMP: case CMPU:
+        parseModInstr(); break;
+    case ADDIL: case LDIL: parseADDIL_LDIL(); break;
+    case B: parseB(); break;
+    case GATE: parseGATE(); break;
+    case BR: case BV: parseBR_BV(); break;
+    case CBR: case CBRU: parseCBR_CBRU(); break;
+    case BVE: parseBVE(); break;
+    case EXTR: parseEXTR(); break;
+    case DEP: parseDEP(); break;
+    case LDR: case STC: parseLDR_STC(); break;
+    case BE: parseBE(); break;
+    case BRK: parseBRK(); break;
+    case DSR: parseDSR(); break;
+    case SHLA: parseSHLA(); break;
+    case PCA: case PTLB: parsePCA_PTLB(); break;
+    case CMR: parseCMR(); break;
+    case DIAG: parseDIAG(); break;
+    case ITLB: parseITLB(); break;
+    case LDO: parseLDO(); break;
+    case LSID: parseLSID(); break;
+    case PRB: parsePRB(); break;
+    case LDPA: parseLDPA(); break;
+    case MR: parseMR(); break;
+    case MST: parseMST(); break;
+    case RFI: break; // No operands
+    case LD: case ST: parseLD_ST(); break;
+    case LDA: case STA: parseLDA_STA(); break;
+    default:
+        printf("not yet implemented\n");
+        break;
+    }
+
+    // ----------------------------------------------------
+    // Step 5: Finalize instruction parsing
+    // ----------------------------------------------------
+    if (lineERR) {
+        skipToEOL();
+        return;
+    }
+    codeAdr += 4;
+    skipToEOL();
     return;
 }
 
-/// @par Parser ProcessDirective
+// =================================================================================
+// ParseDirective
+// =================================================================================
 
+/// @brief Parse assembler directives.
+/// @details
+/// This function identifies and processes directives encountered in the
+/// assembly source. Directives control program organization, memory layout,
+/// symbol definitions, and data initialization.
+///
+/// The function performs the following tasks:
+/// - Validates the directive against a directive table (`dirCodeTab`).
+/// - Ensures directives are allowed in the current program type context.
+/// - Updates symbol tables and scope information.
+/// - Writes values or data into the ELF data section with proper alignment.
+/// - Reports errors and warnings for invalid usage.
+///
+/// **Supported Directives:**
+/// - `GLOBAL`   : Marks program as standalone.
+/// - `MODULE`   : Marks program as module.
+/// - `CODE`     : Defines code section attributes (ADDR, ALIGN, ENTRY).
+/// - `DATA`     : Defines data section attributes (ADDR, ALIGN).
+/// - `ALIGN`    : Adjusts current data address to alignment boundary.
+/// - `EQU`/`REG`: Defines constants or registers in the symbol table.
+/// - `BUFFER`   : Allocates and initializes a memory buffer.
+/// - `BYTE`     : Allocates 1-byte data values.
+/// - `HALF`     : Allocates 2-byte data values (aligned).
+/// - `WORD`     : Allocates 4-byte data values (aligned).
+/// - `DOUBLE`   : Allocates 8-byte data values (aligned).
+/// - `STRING`   : Allocates null-terminated string data.
+/// - `END`      : Marks the end of assembly input.
+///
+/// @note
+/// All data-writing directives ensure proper alignment and padding
+/// in the ELF section. Errors are raised if alignment or usage rules
+/// are violated.
 void ParseDirective() {
-    // printf("DIRECTIVE %s\t", token_old);
-         // Opcode
+    int i = 0;                  ///< General-purpose loop counter
+    int align;                  ///< Alignment value for .ALIGN or section alignment
+    int dataAdrOld;             ///< Stores previous data address before alignment
+    const char* ptr = elfData;  ///< Pointer to ELF data buffer (unused directly here)
 
-    int i = 0;
-    int align;
-    int dataAdrOld;
-    const char* ptr = O_DATA;
+    int buf_size;               ///< Size of buffer for .BUFFER directive
+    int buf_init;               ///< Initialization value for buffer data
 
-    int buf_size;
-    int buf_init;
+    varType = V_VALUE;          ///< Default variable type set to "value"
 
-    VarType = V_VALUE;
-
+    // Normalize directive name
     strcpy(dirCode, tokenSave);
+    strToUpper(dirCode);
 
-    StrToUpper(dirCode);
-
+    // Lookup directive in table
     int num_dircode = (sizeof(dirCodeTab) / sizeof(dirCodeTab[0]));
     bool dirCode_found = FALSE;
-
     for (i = 0; i < num_dircode; i++) {
-
-        if (strcmp(dirCode, dirCodeTab[i].directive) == 0) {		// opCode found
-
+        if (strcmp(dirCode, dirCodeTab[i].directive) == 0) {
             dirCode_found = TRUE;
-            DirType = dirCodeTab[i].directNum;
+            directiveType = dirCodeTab[i].directNum;
             break;
         }
     }
 
+    // Handle unknown directives
     if (dirCode_found == FALSE) {
-
         snprintf(errmsg, sizeof(errmsg), "Invalid directive %s", token);
-        ProcessError(errmsg);
-        SkipToEOL();
+        processError(errmsg);
+        skipToEOL();
         return;
-
-        while (TRUE) {
-
-            GetNextToken();
-
-            if (tokTyp == T_EOL) {
-                return;
-            }
-        }
     }
-    if (dirCode_found == TRUE) {
 
-        switch (DirType) {
+    // Process recognized directive
+    if (dirCode_found == TRUE) {
+        switch (directiveType) {
+
+        // ---------------------------------------------------------------------
+        // Program structure directives
+        // ---------------------------------------------------------------------
 
         case D_GLOBAL:
-
+            /// Marks the program as standalone (cannot coexist with MODULE).
             if (prgType == P_UNDEFINED) {
                 prgType = P_STANDALONE;
             }
             else {
                 snprintf(errmsg, sizeof(errmsg), "invalid %s in Module program", token);
-                ProcessError(errmsg);
-                SkipToEOL();
+                processError(errmsg);
+                skipToEOL();
                 return;
             }
-
             break;
 
         case D_MODULE:
-
+            /// Marks the program as a module (cannot coexist with GLOBAL).
             if (prgType == P_UNDEFINED) {
                 prgType = P_MODULE;
             }
             else {
                 snprintf(errmsg, sizeof(errmsg), "invalid %s in Standalone program", token);
-                ProcessError(errmsg);
-                SkipToEOL();
+                processError(errmsg);
+                skipToEOL();
                 return;
             }
             break;
 
+        // ---------------------------------------------------------------------
+        // Section definitions
+        // ---------------------------------------------------------------------
 
         case D_CODE:
-
+            /// Defines code section attributes: ADDR, ALIGN, ENTRY.
             if (prgType == P_STANDALONE) {
-                GetNextToken();
-                StrToUpper(token);
-                do
-                {
+                // Parse optional parameters (ADDR, ALIGN, ENTRY)
+                fetchToken();
+                strToUpper(token);
+                do {
                     if (strcmp(token, "ADDR") == 0) {
-                        GetNextToken();
-                        O_CODE_ADDR = ParseExpression();
-                        StrToUpper(token);
+                        fetchToken();
+                        elfCodeAddr = parseExpression();
+                        strToUpper(token);
                     }
                     else if (strcmp(token, "ALIGN") == 0) {
-                        
-                        GetNextToken();
-                        O_CODE_ALIGN = ParseExpression();
-                        StrToUpper(token);
-                        if (O_CODE_ALIGN == 0) {
+                        fetchToken();
+                        elfCodeAlign = parseExpression();
+                        strToUpper(token);
+                        if (elfCodeAlign == 0) {
                             snprintf(errmsg, sizeof(errmsg), "Alignment of 0 not allowed");
-                            ProcessError(errmsg);
-                            SkipToEOL();
+                            processError(errmsg);
+                            skipToEOL();
                             return;
                         }
-                        O_DATA_ALIGN = O_CODE_ALIGN;        // default data aligment follows code alignment
-                        if ((O_CODE_ADDR % O_CODE_ALIGN) != 0) {
-                            snprintf(errmsg, sizeof(errmsg), "Address %x not aligned by %x", O_CODE_ADDR, O_CODE_ALIGN);
-                            ProcessError(errmsg);
-                            SkipToEOL();
+                        elfDataAlign = elfCodeAlign; // Default data alignment matches code
+                        if ((elfCodeAddr % elfCodeAlign) != 0) {
+                            snprintf(errmsg, sizeof(errmsg), "Address %x not aligned by %x", elfCodeAddr, elfCodeAlign);
+                            processError(errmsg);
+                            skipToEOL();
                             return;
                         }
                     }
                     else if (strcmp(token, "ENTRY") == 0) {
-                        if (O_ENTRY_SET == FALSE) {
-                            O_ENTRY_SET = TRUE;
+                        if (elfEntryPointStatus == FALSE) {
+                            elfEntryPointStatus = TRUE;
                         }
                         else {
                             snprintf(errmsg, sizeof(errmsg), "Entry point already set");
-                            ProcessError(errmsg);
-                            SkipToEOL();
+                            processError(errmsg);
+                            skipToEOL();
                             return;
                         }
-                        GetNextToken();
+                        fetchToken();
                     }
-
                     else {
                         snprintf(errmsg, sizeof(errmsg), "Invalid Parameter %s", token);
-                        ProcessError(errmsg);
-                        SkipToEOL();
+                        processError(errmsg);
+                        skipToEOL();
                         return;
                     }
                     if (tokTyp == T_COMMA) {
-                        GetNextToken();
-                        StrToUpper(token);
+                        fetchToken();
+                        strToUpper(token);
                     }
                 } while (tokTyp != T_EOL);
 
-                if (O_ENTRY_SET == TRUE) {
-                    O_ENTRY = O_CODE_ADDR;
+                if (elfEntryPointStatus == TRUE) {
+                    elfEntryPoint = elfCodeAddr;
                 }
             }
             else {
                 snprintf(errmsg, sizeof(errmsg), "invalid %s in Module program", token);
-                ProcessError(errmsg);
-                SkipToEOL();
+                processError(errmsg);
+                skipToEOL();
                 return;
             }
             break;
 
-
         case D_DATA:
-
+            /// Defines data section attributes: ADDR, ALIGN.
             if (prgType == P_STANDALONE) {
-                GetNextToken();
-                StrToUpper(token);
-                do
-                {
+                fetchToken();
+                strToUpper(token);
+                do {
                     if (strcmp(token, "ADDR") == 0) {
-                        GetNextToken();
-                        O_DATA_ADDR = ParseExpression();
-                        StrToUpper(token);
+                        fetchToken();
+                        elfDataAddr = parseExpression();
+                        strToUpper(token);
                     }
                     else if (strcmp(token, "ALIGN") == 0) {
-
-                        GetNextToken();
-                        O_DATA_ALIGN = ParseExpression();
-                        StrToUpper(token);
-                        if (O_DATA_ALIGN == 0) {
+                        fetchToken();
+                        elfDataAlign = parseExpression();
+                        strToUpper(token);
+                        if (elfDataAlign == 0) {
                             snprintf(errmsg, sizeof(errmsg), "Alignment of 0 not allowed");
-                            ProcessError(errmsg);
-                            SkipToEOL();
+                            processError(errmsg);
+                            skipToEOL();
                             return;
                         }
-                        if ((O_DATA_ADDR % O_DATA_ALIGN) != 0) {
-                            snprintf(errmsg, sizeof(errmsg), "Address %x not aligned by %x", O_DATA_ADDR, O_DATA_ALIGN);
-                            ProcessError(errmsg);
-                            SkipToEOL();
+                        if ((elfDataAddr % elfDataAlign) != 0) {
+                            snprintf(errmsg, sizeof(errmsg), "Address %x not aligned by %x", elfDataAddr, elfDataAlign);
+                            processError(errmsg);
+                            skipToEOL();
                             return;
                         }
                     }
                     else {
                         snprintf(errmsg, sizeof(errmsg), "Invalid Parameter %s", token);
-                        ProcessError(errmsg);
-                        SkipToEOL();
+                        processError(errmsg);
+                        skipToEOL();
                         return;
                     }
                     if (tokTyp == T_COMMA) {
-                        GetNextToken();
-                        StrToUpper(token);
+                        fetchToken();
+                        strToUpper(token);
                     }
                 } while (tokTyp != T_EOL);
             }
             else {
                 snprintf(errmsg, sizeof(errmsg), "invalid %s in Module program", token);
-                ProcessError(errmsg);
-                SkipToEOL();
+                processError(errmsg);
+                skipToEOL();
                 return;
             }
             break;
 
-        case D_ALIGN:
+        // ---------------------------------------------------------------------
+        // Alignment directives
+        // ---------------------------------------------------------------------
 
-            GetNextToken();
+        case D_ALIGN:
+            /// Aligns data address to specified boundary (optionally with 'K' suffix).
+            fetchToken();
             align = atoi(token);
-            GetNextToken();
-            StrToUpper(token);
-            if (strcmp(token,"K") == 0) {
+            fetchToken();
+            strToUpper(token);
+            if (strcmp(token, "K") == 0) {
                 align = align * 1024;
             }
             dataAdr = ((dataAdr / align) * align) + align;
             if ((align % 2) != 0) {
-                snprintf(errmsg, sizeof(errmsg), "alignment not a power of 2", token);
-                ProcessWarning(errmsg);
+                snprintf(errmsg, sizeof(errmsg), "alignment %s not a power of 2", token);
+                processWarning(errmsg);
             }
-
             break;
+
+        // ---------------------------------------------------------------------
+        // Symbol definition directives
+        // ---------------------------------------------------------------------
 
         case D_EQU:
         case D_REG:
-
-            GetNextToken();
-            if (CheckReservedWord()) {
-
-                AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+            /// Defines constants or registers in the current scope.
+            fetchToken();
+            if (checkReservedWord()) {
+                addDirectiveToScope(SCOPE_DIRECT, label, dirCode, token, lineNr);
             }
-            else
-            {
+            else {
                 snprintf(errmsg, sizeof(errmsg), "Symbol %s is a reserved word", label);
-                ProcessError(errmsg);
-                SkipToEOL();
+                processError(errmsg);
+                skipToEOL();
                 return;
             }
             break;
 
+        // ---------------------------------------------------------------------
+        // Memory allocation and initialization
+        // ---------------------------------------------------------------------
 
         case D_BUFFER:
-            GetNextToken();
-            StrToUpper(token);
-            do
-            {
+            /// Allocates and initializes a buffer in the ELF data section.
+            fetchToken();
+            strToUpper(token);
+            do {
                 if (strcmp(token, "SIZE") == 0) {
-                    GetNextToken();
-                    buf_size = ParseExpression();
-                    StrToUpper(token);
+                    fetchToken();
+                    buf_size = parseExpression();
+                    strToUpper(token);
                 }
                 else if (strcmp(token, "INIT") == 0) {
-
-                    GetNextToken();
-                    buf_init = ParseExpression();
-                    StrToUpper(token);
+                    fetchToken();
+                    buf_init = parseExpression();
+                    strToUpper(token);
                 }
                 else {
                     snprintf(errmsg, sizeof(errmsg), "Invalid Parameter %s", token);
-                    ProcessError(errmsg);
-                    SkipToEOL();
+                    processError(errmsg);
+                    skipToEOL();
                     return;
                 }
                 if (tokTyp == T_COMMA) {
-                    GetNextToken();
-                    StrToUpper(token);
+                    fetchToken();
+                    strToUpper(token);
                 }
             } while (tokTyp != T_EOL);
 
-            // Align on word boundary
+            // Align to word boundary
             dataAdrOld = dataAdr;
             if ((dataAdr % 4) != 0) {
                 dataAdr = ((dataAdr / 4) * 4) + 4;
             }
             if ((dataAdrOld - dataAdr) != 0) {
-                strcpy(O_DATA, "\0\0\0\0\0\0\0\0");
-                addDataSectionData(O_DATA, dataAdr - dataAdrOld);
+                strcpy(elfData, "\0\0\0\0\0\0\0\0");
+                addDataSectionData(elfData, dataAdr - dataAdrOld);
             }
-            // Write in SYMTAB
-            AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
+            // Write symbol table entry
+            addDirectiveToScope(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
+            // Allocate memory for buffer
+            elfBuffer = (char*)malloc(buf_size);
+            elfDataLength = 0;
 
-            // allocate memory area for data
-            p_data = (char*)malloc(buf_size);
-            O_dataLen = 0;
-
-
-
-            /// init data buffer
-            
-            do
-            {
-                p_data[0 + O_dataLen] = buf_init & 0xFF;
-                O_dataLen++;
+            // Initialize buffer
+            do {
+                elfBuffer[elfDataLength] = buf_init & 0xFF;
+                elfDataLength++;
                 buf_size--;
             } while (buf_size > 0);
-            
-            addDataSectionData(p_data, O_dataLen);
 
-            dataAdr = (dataAdr + O_dataLen);
-
+            addDataSectionData(elfBuffer, elfDataLength);
+            dataAdr = (dataAdr + elfDataLength);
             break;
 
-        case D_END:
-            break;
+
+
+        // ---------------------------------------------------------------------
+        // Data definition directives
+        // ---------------------------------------------------------------------
+        // (BYTE, HALF, WORD, DOUBLE, STRING)
+        // These allocate data of fixed sizes, align addresses, and write values
+        // into the ELF data section in big-endian format.
 
         case D_BYTE:
 
             if ((currentScopeLevel == SCOPE_MODULE) || (currentScopeLevel == SCOPE_PROGRAM)) {
-                VarType = V_MEMGLOBAL;
+                varType = V_MEMGLOBAL;
             }
             if (currentScopeLevel == SCOPE_FUNCTION) {
-                VarType = V_MEMLOCAL;
+                varType = V_MEMLOCAL;
             }
-            GetNextToken();
+            fetchToken();
 
             // Check if negative value
 
@@ -4398,22 +4355,22 @@ void ParseDirective() {
             if (tokTyp == T_MINUS) {
 
                 is_negative = TRUE;
-                GetNextToken();
+                fetchToken();
             }
 
             // expression calculation 
-            value = ParseExpression();
+            value = parseExpression();
             strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
 
 
             // Write in SYMTAB
-            AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+            addDirectiveToScope(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
             // Write in DATA SECTION of ELF File in BIG Endian format
-            O_DATA[0] = value & 0xFF;
-            O_dataLen = 1;
+            elfData[0] = value & 0xFF;
+            elfDataLength = 1;
 
-            addDataSectionData(O_DATA,O_dataLen);
+            addDataSectionData(elfData,elfDataLength);
 
             // adjust data address
             if ((dataAdr % 1) == 0) {
@@ -4425,12 +4382,12 @@ void ParseDirective() {
         case D_HALF:
 
             if ((currentScopeLevel == SCOPE_MODULE) || (currentScopeLevel == SCOPE_PROGRAM)) {
-                VarType = V_MEMGLOBAL;
+                varType = V_MEMGLOBAL;
             }
             if (currentScopeLevel == SCOPE_FUNCTION) {
-                VarType = V_MEMLOCAL;
+                varType = V_MEMLOCAL;
             }
-            GetNextToken();
+            fetchToken();
 
             // Check if negative value
 
@@ -4438,11 +4395,11 @@ void ParseDirective() {
             if (tokTyp == T_MINUS) {
 
                 is_negative = TRUE;
-                GetNextToken();
+                fetchToken();
             }
 
             // expression calculation 
-            value = ParseExpression();
+            value = parseExpression();
             strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
 
             // Align on half word boundary
@@ -4451,19 +4408,19 @@ void ParseDirective() {
                 dataAdr = ((dataAdr / 2) * 2) + 2;
             }
             if ((dataAdrOld - dataAdr) != 0) {
-                strcpy(O_DATA, "\0\0\0\0\0\0\0\0");
-                addDataSectionData(O_DATA, dataAdr - dataAdrOld);
+                strcpy(elfData, "\0\0\0\0\0\0\0\0");
+                addDataSectionData(elfData, dataAdr - dataAdrOld);
             }
 
             // Write in SYMTAB
-            AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+            addDirectiveToScope(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
             // Write in DATA SECTION of ELF File in BIG Endian format
-            O_DATA[0] = (value >> 8) & 0xFF;
-            O_DATA[1] = value & 0xFF;
-            O_dataLen = 2;
+            elfData[0] = (value >> 8) & 0xFF;
+            elfData[1] = value & 0xFF;
+            elfDataLength = 2;
 
-            addDataSectionData(O_DATA, O_dataLen);
+            addDataSectionData(elfData, elfDataLength);
 
             // adjust data address
             if ((dataAdr % 2) == 0) {
@@ -4474,12 +4431,12 @@ void ParseDirective() {
         case D_WORD:
 
             if ((currentScopeLevel == SCOPE_MODULE) || (currentScopeLevel == SCOPE_PROGRAM)) {
-                VarType = V_MEMGLOBAL;
+                varType = V_MEMGLOBAL;
             }
             if (currentScopeLevel == SCOPE_FUNCTION) {
-                VarType = V_MEMLOCAL;
+                varType = V_MEMLOCAL;
             }
-            GetNextToken();
+            fetchToken();
 
             // Check if negative value
     
@@ -4487,11 +4444,11 @@ void ParseDirective() {
             if (tokTyp == T_MINUS) {
 
                 is_negative = TRUE;
-                GetNextToken();
+                fetchToken();
             }
     
             // expression calculation 
-            value = ParseExpression();
+            value = parseExpression();
             strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
 
             // Align on word boundary
@@ -4500,22 +4457,22 @@ void ParseDirective() {
                 dataAdr = ((dataAdr / 4) * 4) + 4;
             }
             if ((dataAdrOld - dataAdr) != 0) {
-                strcpy(O_DATA, "\0\0\0\0\0\0\0\0");
-                addDataSectionData(O_DATA, dataAdr - dataAdrOld);
+                strcpy(elfData, "\0\0\0\0\0\0\0\0");
+                addDataSectionData(elfData, dataAdr - dataAdrOld);
             }
 
             // Write in SYMTAB
-            AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+            addDirectiveToScope(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
             // Write in DATA SECTION of ELF File in BIG Endian format
 
-            O_DATA[0] = (value >> 24) & 0xFF;
-            O_DATA[1] = (value >> 16) & 0xFF;
-            O_DATA[2] = (value >> 8) & 0xFF;
-            O_DATA[3] = value & 0xFF;
-            O_dataLen = 4;
+            elfData[0] = (value >> 24) & 0xFF;
+            elfData[1] = (value >> 16) & 0xFF;
+            elfData[2] = (value >> 8) & 0xFF;
+            elfData[3] = value & 0xFF;
+            elfDataLength = 4;
 
-            addDataSectionData(O_DATA, O_dataLen);
+            addDataSectionData(elfData, elfDataLength);
 
             // adjust data address
             if ((dataAdr % 4) == 0) {
@@ -4526,12 +4483,12 @@ void ParseDirective() {
         case D_DOUBLE:
 
             if ((currentScopeLevel == SCOPE_MODULE) || (currentScopeLevel == SCOPE_PROGRAM)) {
-                VarType = V_MEMGLOBAL;
+                varType = V_MEMGLOBAL;
             }
             if (currentScopeLevel == SCOPE_FUNCTION) {
-                VarType = V_MEMLOCAL;
+                varType = V_MEMLOCAL;
             }
-            GetNextToken();
+            fetchToken();
 
             // Check if negative value
 
@@ -4539,11 +4496,11 @@ void ParseDirective() {
             if (tokTyp == T_MINUS) {
 
                 is_negative = TRUE;
-                GetNextToken();
+                fetchToken();
             }
 
             // expression calculation 
-            value = ParseExpression();
+            value = parseExpression();
             strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
 
             // Align on double word boundary
@@ -4552,26 +4509,26 @@ void ParseDirective() {
                 dataAdr = ((dataAdr / 8) * 8) + 8;
             }
             if ((dataAdrOld - dataAdr) != 0) {
-                strcpy(O_DATA, "\0\0\0\0\0\0\0\0");
-                addDataSectionData(O_DATA, dataAdr - dataAdrOld);
+                strcpy(elfData, "\0\0\0\0\0\0\0\0");
+                addDataSectionData(elfData, dataAdr - dataAdrOld);
             }
 
             // Write in SYMTAB
-            AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+            addDirectiveToScope(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
             // Write in DATA SECTION of ELF File in BIG Endian format
 
-            O_DATA[0] = (value >> 56) & 0xFF;
-            O_DATA[1] = (value >> 48) & 0xFF;
-            O_DATA[2] = (value >> 40) & 0xFF;
-            O_DATA[3] = (value >> 32) & 0xFF;
-            O_DATA[4] = (value >> 24) & 0xFF;
-            O_DATA[5] = (value >> 16) & 0xFF;
-            O_DATA[6] = (value >> 8) & 0xFF;
-            O_DATA[7] = value & 0xFF;
-            O_dataLen = 8;
+            elfData[0] = (value >> 56) & 0xFF;
+            elfData[1] = (value >> 48) & 0xFF;
+            elfData[2] = (value >> 40) & 0xFF;
+            elfData[3] = (value >> 32) & 0xFF;
+            elfData[4] = (value >> 24) & 0xFF;
+            elfData[5] = (value >> 16) & 0xFF;
+            elfData[6] = (value >> 8) & 0xFF;
+            elfData[7] = value & 0xFF;
+            elfDataLength = 8;
 
-            addDataSectionData(O_DATA, O_dataLen);
+            addDataSectionData(elfData, elfDataLength);
 
             // adjust data address
             if ((dataAdr % 8) == 0) {
@@ -4581,34 +4538,38 @@ void ParseDirective() {
 
         case D_STRING:
             
-            GetNextToken();
+            fetchToken();
 
             // Align on word boundary
             dataAdrOld = dataAdr;
             if ((dataAdr % 4) != 0) {
                 dataAdr = ((dataAdr / 4) * 4) + 4;
             }
-            strcpy(O_DATA, "\0\0\0\0\0\0\0\0");
-            addDataSectionData(O_DATA, dataAdr - dataAdrOld);
+            strcpy(elfData, "\0\0\0\0\0\0\0\0");
+            addDataSectionData(elfData, dataAdr - dataAdrOld);
 
             // Write in SYMTAB
-            AddDirective(SCOPE_DIRECT, label, dirCode, token, lineNr);
+            addDirectiveToScope(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
-            strcpy(O_DATA,token) ;
-            O_dataLen = strlen(token) + 1;
+            strcpy(elfData,token) ;
+            elfDataLength = strlen(token) + 1;
 
             
-            addDataSectionData(O_DATA, O_dataLen);
+            addDataSectionData(elfData, elfDataLength);
 
             // adjust data address
             
-            dataAdr = (dataAdr + O_dataLen);
+            dataAdr = (dataAdr + elfDataLength);
 
             break;
 
+        case D_END:
+                /// Marks end of program input (no action required here).
+                break;
+
         } // end switch
-        strcpy(label, "");
-        VarType = V_VALUE;
+    strcpy(label, "");
+    varType = V_VALUE;
 
     } // end directive found
 }

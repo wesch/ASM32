@@ -1,44 +1,60 @@
 #include "constants.hpp"
 #include "ASM32.hpp"
 
-/// @file
-/// \brief reads the AST and the symtab and builds the maschine code
+/// \file
+/// \brief AST reader and binary generator
+/// \details
+/// This module reads the abstract syntax tree (AST) and the symbol table,
+/// translates instructions into binary form, and builds the final machine code
+/// representation. It provides helper functions for bit manipulation,
+/// register encoding, option parsing, and AST traversal.
+
+// ============================================================================
+// Bit Manipulation Helpers
+// ============================================================================
+
+/// \brief Set bits in the current instruction.
+/// \details
+/// Inserts a value into a specific bit range of the current binary instruction.
+/// Performs range checks and signals errors if the input exceeds the allowed
+/// number of bits.
 /// 
+/// \param pos Position in the instruction (0 = MSB, 31 = LSB).
+/// \param x   Value to be inserted.
+/// \param num Number of bits.
 
-
-// Funktion suche label in Symboltabelle
-
-
-
-/// @par sets bit in instruction
-///    - pos -> Position in instruction
-///    - x   -> zu setzender Wert
-///    - num -> Anzahl Stellen -> maske
-
-void SetBit(int pos, int x, int num) {
+void setBit(int pos, int x, int num) {
     
     int limit = pow(2, num);
     if (x > (limit - 1) ||
         x < (-limit)) {
 
         snprintf(errmsg, sizeof(errmsg), "Value %d out of range", x);
-        ProcessError(errmsg);
+        processError(errmsg);
     }
     int mask = pow(2, num) - 1;
     int val = (x & mask);
     binInstr = binInstr | val << (31 - pos);
 }
 
-/// @par clrs 1 bit in instruction
-///    - pos -> Position in instruction
-/// 
-void ClrBit(int pos) {
+/// \brief Clear a single bit in the current instruction.
+/// \param pos Position in the instruction (0 = MSB, 31 = LSB).
+void clrBit(int pos) {
 
     binInstr &= ~(1 << (31 - pos));
 
 }
 
-void SetOffset(int pos, int x, int num) {
+/// \brief Set an instruction offset field.
+/// \details
+/// Handles immediate offsets and generates additional instructions if the
+/// offset exceeds the field width. Supports special handling for offsets larger
+/// than the hardware limit.
+/// 
+/// \param pos Position in the instruction.
+/// \param x   Offset value.
+/// \param num Number of bits available for encoding.
+void setOffset(int pos, int x, int num) {
     
 //   x = 4096;   // Test for large offset
     
@@ -54,7 +70,7 @@ void SetOffset(int pos, int x, int num) {
         binInstr = 0x0B400000 | (0xFFFFFC00 & x);
         bin_status = B_BINCHILD;
         strcpy(infmsg, "generated Instruction: ADDIL DP,L%limit due to offset > limit\n");
-        WriteBinary();   
+        createBinary();   
 
         codeAdr = codeAdr + 4;
         binInstr = binInstrSave;
@@ -62,22 +78,28 @@ void SetOffset(int pos, int x, int num) {
         strcpy(opchar[2], "R1");
         strcpy(infmsg, "modified Instruction offset regB -> R1, R%limit \n");
 
-        SetGenRegister('B', opchar[2]);
+        setGenRegister('B', opchar[2]);
 
         opnum[1] = 0;
     }
     num = x & 0x3FF;
-    SetBit(26, num, 11);
+    setBit(26, num, 11);
 
 
 }
+// ============================================================================
+// Register Encoding Helpers
+// ============================================================================
 
-/// @par sets register nummer
-///     - reg     -> R, B, A register
-///     - regname -> Name das Register e.g. R12
-///     only regular register yet
+/// \brief Encode a general-purpose register.
+/// \details
+/// Encodes register operands (R, A, or B) into the correct instruction fields.
+/// Only values between 1 and 15 are valid.
+/// 
+/// \param reg     Register type ('R', 'A', or 'B').
+/// \param regname Name of the register, e.g., "R12".
 
-void SetGenRegister(int reg, char* regname) {
+void setGenRegister(int reg, char* regname) {
 
     int x = strlen(regname);
     char t[2];
@@ -94,33 +116,25 @@ void SetGenRegister(int reg, char* regname) {
     }
     if (value < 1 || value > 15) {
         
-        snprintf(errmsg, sizeof(errmsg), "General register # %d out of range", value);
-        ProcessError(errmsg);
+        snprintf(errmsg, sizeof(errmsg), "General register # %d out of range", (int)value);
+        processError(errmsg);
         return; 
     }
     switch (reg) {
-    case 'R':
-        
-        SetBit(9, value,4);
-        break;
-    
-    case 'A':
-        
-        SetBit(27, value,4);
-        break;
-    
-    case 'B':
-    
-        SetBit(31, value,4);
-        break;
+    case 'R':   setBit(9, value,4); break;
+    case 'A':   setBit(27, value,4); break;
+    case 'B':   setBit(31, value,4); break;
     }
 
 }
 
-/// @par sets register nummer for MR instruction
-///     - regname -> Name das Register e.g. S1 or C12
+/// \brief Encode a special register for MR instructions.
+/// \details
+/// Supports Segment (S1–S7) and Control (C1–C31) registers. Validates
+/// register number ranges and signals errors for invalid names.
 /// 
-void SetMRRegister(char* regname) {
+/// \param regname Register name, e.g., "S1" or "C12".
+void setMRRegister(char* regname) {
 
     int x = strlen(regname);
     char t[2];
@@ -138,26 +152,31 @@ void SetMRRegister(char* regname) {
     if (regname[0] == 'S') {
         if (value < 1 || value > 7) {
 
-            snprintf(errmsg, sizeof(errmsg), "Segment register # %d out of range", value);
-            ProcessError(errmsg);
+            snprintf(errmsg, sizeof(errmsg), "Segment register # %d out of range", (int ) value);
+            processError(errmsg);
             return;
         }
     }
     else if (regname[0] == 'C') {
         if (value < 1 || value > 31) {
 
-            snprintf(errmsg, sizeof(errmsg), "Control register # %d out of range", value);
-            ProcessError(errmsg);
+            snprintf(errmsg, sizeof(errmsg), "Control register # %d out of range", (int ) value);
+            processError(errmsg);
             return;
         }
     }
-    SetBit(31, value, 5);
+    setBit(31, value, 5);
 }
 
-/// @par provides segment register number
-///     - regname -> Name das Register e.g. S1
+/// \brief Retrieve a segment register number.
+/// \details
+/// Extracts the numeric part from a segment register name (S1–S7).
+/// Returns 0 and signals an error if the value is out of range.
+/// 
+/// \param regname Segment register name (e.g., "S1").
+/// \return The numeric value (1–7) or 0 on error.
 
-int GetSegRegister(char* regname) {
+int getSegRegister(char* regname) {
 
     int x = strlen(regname);
     char t[2];
@@ -173,9 +192,8 @@ int GetSegRegister(char* regname) {
         value = 10 * (t[0] - 48) + (t[1] - 48);
     }
     if (value < 1 || value > 7) {
-
-        snprintf(errmsg, sizeof(errmsg), "Segment register # %d out of range", value);
-        ProcessError(errmsg);
+        snprintf(errmsg, sizeof(errmsg), "Segment register # %d out of range", (int)value);
+        processError(errmsg);
         return 0;
     }
 
@@ -187,16 +205,24 @@ int GetSegRegister(char* regname) {
 
 
 
-/// @par Generate binary Instruction option part
+// ============================================================================
+// Binary Generation
+// ============================================================================
 
-void GenBinOption() {
+/// \brief Generate the option part of a binary instruction.
+/// \details
+/// Parses instruction options (e.g., CMP conditions, AND/OR modifiers)
+/// and sets the corresponding bits. Performs validation to prevent
+/// invalid combinations or missing options.
+
+void genBinOption() {
     // printf("adr: %04x binInstr %08x, Optype %d, Option %s %s Opchar %s %s %s Opnum %d %d %d Mode %d\t", codeAdr, binInstr, OpType, option[0], option[1], opchar[0], opchar[1], opchar[2], opnum[0], opnum[1], opnum[2], mode);
 
 
     int count = 0;
 
     // process option
-    switch (OpType) {
+    switch (opInstrType) {
 
     case ADD:
     case ADC:
@@ -205,21 +231,14 @@ void GenBinOption() {
     case SUB:
 
         
-        for (j = 0; j < strlen(option[0]); j++) {
+        for (int j = 0; j < strlen(option[0]); j++) {
 
             switch (option[0][j]) {
 
-            case 'L':
-                SetBit(10, 1, 1);
-                break;
-
-            case 'O':
-                SetBit(11, 1, 1);
-                break;
-
-            default:
-                snprintf(errmsg, sizeof(errmsg), "Invalid Option %c", option[0][j],lineNr,column);
-                ProcessError(errmsg);
+            case 'L':   setBit(10, 1, 1); break;
+            case 'O':   setBit(11, 1, 1); break;
+            default:    snprintf(errmsg, sizeof(errmsg), "Invalid Option %c", option[0][j]); 
+                processError(errmsg);
             }
         }
         break;
@@ -227,34 +246,26 @@ void GenBinOption() {
     case AND:
     case OR:
 
-        for (j = 0; j < strlen(option[0]); j++) {
+        for (int j = 0; j < strlen(option[0]); j++) {
 
             switch (option[0][j]) {
 
             case 'N':
-            case 'C':
-                count++;
+            case 'C':   count++;
             }
             if (count > 1) {
                 snprintf(errmsg, sizeof(errmsg), "Option N and C not at the same time");
-                ProcessError(errmsg);
+                processError(errmsg);
                 break;
             }
         }
-        for (j = 0; j < strlen(option[0]); j++) {
+        for (int j = 0; j < strlen(option[0]); j++) {
             switch (option[0][j]) {
 
-            case 'N':
-                SetBit(10, 1, 1);
-                break;
-
-            case 'C':
-                SetBit(11, 1, 1);
-                break;
-
-            default:
-                snprintf(errmsg, sizeof(errmsg), "Invalid Option %c", option[0][j]);
-                ProcessError(errmsg);
+            case 'N':   setBit(10, 1, 1); break;
+            case 'C':   setBit(11, 1, 1); break;
+            default:    snprintf(errmsg, sizeof(errmsg), "Invalid Option %c", option[0][j]);    
+                processError(errmsg);
             }
         }
         break;
@@ -266,23 +277,23 @@ void GenBinOption() {
 
         }
         else if (option[0][0] == 'L' && option[0][1] == 'T') {
-            SetBit(11, 1, 1);
+            setBit(11, 1, 1);
         }
         else if (option[0][0] == 'N' && option[0][1] == 'E') {
-            SetBit(10, 1, 1);
+            setBit(10, 1, 1);
         }
         else if (option[0][0] == 'L' && option[0][1] == 'E') {
-            SetBit(10, 1, 1);
-            SetBit(11, 1, 1);
+            setBit(10, 1, 1);
+            setBit(11, 1, 1);
         }
         else {
             if (option[0][0] == '\0') {
                 snprintf(errmsg, sizeof(errmsg), "Missing Option for CMP/CMPU");
-                ProcessError(errmsg);
+                processError(errmsg);
                 break;
             }
             snprintf(errmsg, sizeof(errmsg), "Invalid Option %c%c", option[0][0], option[0][1]);
-            ProcessError(errmsg);
+            processError(errmsg);
         }
         break;
 
@@ -292,39 +303,39 @@ void GenBinOption() {
         if (option[0][0] == 'E' && option[0][1] == 'Q') {
 
         } else if (option[0][0] == 'L' && option[0][1] == 'T') {
-            SetBit(7, 1, 1);
+            setBit(7, 1, 1);
         }
         else if (option[0][0] == 'N' && option[0][1] == 'E') {
-            SetBit(6, 1, 1);
+            setBit(6, 1, 1);
         }
         else if (option[0][0] == 'L' && option[0][1] == 'E') {
-            SetBit(6, 1, 1);
-            SetBit(7, 1, 1);
+            setBit(6, 1, 1);
+            setBit(7, 1, 1);
         }
         else {
             if (option[0][0] == '\0') {
                 snprintf(errmsg, sizeof(errmsg), "Missing Option for CBR/CBRU");
-                ProcessError(errmsg);
+                processError(errmsg);
                 break;
             }
             snprintf(errmsg, sizeof(errmsg), "Invalid Option %c%c", option[0][0], option[0][1]);
-            ProcessError(errmsg);
+            processError(errmsg);
         }
         break;
 
     case XOR:
 
-        for (j = 0; j < strlen(option[0]); j++) {
+        for (int j = 0; j < strlen(option[0]); j++) {
 
             switch (option[0][j]) {
 
             case 'N':
-                SetBit(10, 1, 1);
+                setBit(10, 1, 1);
                 break;
 
             default:
                 snprintf(errmsg, sizeof(errmsg), "Invalid Option %c", option[0][j]);
-                ProcessError(errmsg);
+                processError(errmsg);
             }
         }
         break;
@@ -341,34 +352,34 @@ void GenBinOption() {
 
         }
         else if (option[0][0] == 'L' && option[0][1] == 'T') {
-            SetBit(13, 1, 1);
+            setBit(13, 1, 1);
         }
         else if (option[0][0] == 'G' && option[0][1] == 'T') {
-            SetBit(12, 1, 1);
+            setBit(12, 1, 1);
         }
         else if (option[0][0] == 'E' && option[0][1] == 'V') {
-            SetBit(12, 1, 1);
-            SetBit(13, 1, 1);
+            setBit(12, 1, 1);
+            setBit(13, 1, 1);
         }
         else if (option[0][0] == 'N' && option[0][1] == 'E') {
-            SetBit(11, 1, 1);
+            setBit(11, 1, 1);
         }
         else if (option[0][0] == 'L' && option[0][1] == 'E') {
-            SetBit(11, 1, 1);
-            SetBit(13, 1, 1);
+            setBit(11, 1, 1);
+            setBit(13, 1, 1);
         }
         else if (option[0][0] == 'G' && option[0][1] == 'E') {
-            SetBit(11, 1, 1);
-            SetBit(12, 1, 1);
+            setBit(11, 1, 1);
+            setBit(12, 1, 1);
         }
         else if (option[0][0] == 'O' && option[0][1] == 'D') {
-            SetBit(11, 1, 1);
-            SetBit(12, 1, 1);
-            SetBit(13, 1, 1);
+            setBit(11, 1, 1);
+            setBit(12, 1, 1);
+            setBit(13, 1, 1);
         }
         else {
             snprintf(errmsg, sizeof(errmsg), "Invalid Option %c%c", option[0][0], option[0][1]);
-            ProcessError(errmsg);
+            processError(errmsg);
         }
         break;
 
@@ -376,123 +387,123 @@ void GenBinOption() {
     case EXTR:
 
         mode = 0;
-        for (j = 0; j < strlen(option[0]); j++) {
+        for (int j = 0; j < strlen(option[0]); j++) {
 
             switch (option[0][j]) {
 
             case 'S':
-                SetBit(10, 1, 1);
+                setBit(10, 1, 1);
                 break;
 
             case 'A':
-                SetBit(11, 1, 1);
+                setBit(11, 1, 1);
                 mode = 1;
                 break;
 
             default:
                 snprintf(errmsg, sizeof(errmsg), "Invalid Option %c", option[0][j]);
-                ProcessError(errmsg);
+                processError(errmsg);
             }
         }
         break;
 
     case PCA:
 
-        for (j = 0; j < strlen(option[0]); j++) {
+        for (int j = 0; j < strlen(option[0]); j++) {
 
             switch (option[0][j]) {
 
             case 'T':
-                SetBit(10, 1, 1);
+                setBit(10, 1, 1);
                 break;
 
             case 'M':
-                SetBit(11, 1, 1);
+                setBit(11, 1, 1);
                 break;
 
             case 'F':
-                SetBit(14, 1, 1);
+                setBit(14, 1, 1);
                 break;
 
             default:
                 snprintf(errmsg, sizeof(errmsg), "Invalid Option %c", option[0][j]);
-                ProcessError(errmsg);
+                processError(errmsg);
             }
         }
         break;
 
     case PTLB:
 
-        for (j = 0; j < strlen(option[0]); j++) {
+        for (int j = 0; j < strlen(option[0]); j++) {
 
             switch (option[0][j]) {
 
             case 'T':
-                SetBit(10, 1, 1);
+                setBit(10, 1, 1);
                 break;
 
             case 'M':
-                SetBit(11, 1, 1);
+                setBit(11, 1, 1);
                 break;
 
             default:
                 snprintf(errmsg, sizeof(errmsg), "Invalid Option %c", option[0][j]);
-                ProcessError(errmsg);
+                processError(errmsg);
             }
         }
         break;
 
     case ITLB:
 
-        for (j = 0; j < strlen(option[0]); j++) {
+        for (int j = 0; j < strlen(option[0]); j++) {
 
             switch (option[0][j]) {
 
             case 'T':
-                SetBit(10, 1, 1);
+                setBit(10, 1, 1);
                 break;
 
             default:
                 snprintf(errmsg, sizeof(errmsg), "Invalid Option %c", option[0][j]);
-                ProcessError(errmsg);
+                processError(errmsg);
             }
         }
         break;
 
     case DSR:
 
-        for (j = 0; j < strlen(option[0]); j++) {
+        for (int j = 0; j < strlen(option[0]); j++) {
 
             switch (option[0][j]) {
 
             case 'A':
-                SetBit(10, 1, 1);
+                setBit(10, 1, 1);
                 break;
 
             default:
                 snprintf(errmsg, sizeof(errmsg), "Invalid Option %c", option[0][j]);
-                ProcessError(errmsg);
+                processError(errmsg);
             }
         }
         break;
 
     case MR:
 
-        for (j = 0; j < strlen(option[0]); j++) {
+        for (int j = 0; j < strlen(option[0]); j++) {
 
             switch (option[0][j]) {
 
             case 'D':
-                SetBit(10, 1, 1);
+                setBit(10, 1, 1);
                 break;
 
             case 'M':
-                SetBit(11, 1, 1);
+                setBit(11, 1, 1);
                 break;
 
             default:
                 snprintf(errmsg, sizeof(errmsg), "Invalid Option %c", option[0][j]);
-                ProcessError(errmsg);
+                processError(errmsg);
             }
         }
         break;
@@ -506,62 +517,62 @@ void GenBinOption() {
             break;
 
         case 'S':
-            SetBit(11, 1, 1);
+            setBit(11, 1, 1);
             break;
 
         case 'C':
-            SetBit(10, 1, 1);
+            setBit(10, 1, 1);
             break;
 
         default:
-            snprintf(errmsg, sizeof(errmsg), "Invalid Option %c", option[0][j]);
-            ProcessError(errmsg);
+            snprintf(errmsg, sizeof(errmsg), "Invalid Option %c", option[0][0]);
+            processError(errmsg);
         }
         break;
 
 
     case PRB:
 
-        for (j = 0; j < strlen(option[0]); j++) {
+        for (int j = 0; j < strlen(option[0]); j++) {
 
             switch (option[0][j]) {
 
             case 'W':
-                SetBit(10, 1, 1);
+                setBit(10, 1, 1);
                 break;
 
             case 'I':
-                SetBit(11, 1, 1);
+                setBit(11, 1, 1);
                 break;
 
             default:
                 snprintf(errmsg, sizeof(errmsg), "Invalid Option %c", option[0][j]);
-                ProcessError(errmsg);
+                processError(errmsg);
             }
         }
         break;
 
     case DEP:
 
-        for (j = 0; j < strlen(option[0]); j++) {
+        for (int j = 0; j < strlen(option[0]); j++) {
 
             switch (option[0][j]) {
 
             case 'Z':
-                SetBit(10, 1, 1);
+                setBit(10, 1, 1);
                 break;
 
             case 'A':
-                SetBit(11, 1, 1);
+                setBit(11, 1, 1);
                 break;
 
             case 'I':
-                SetBit(12, 1, 1);
+                setBit(12, 1, 1);
                 break;
 
             default:
                 snprintf(errmsg, sizeof(errmsg), "Invalid Option %c", option[0][j]);
-                ProcessError(errmsg);
+                processError(errmsg);
             }
         }
         break;
@@ -570,18 +581,18 @@ void GenBinOption() {
     case LDA:
     case ST:
 
-        for (j = 0; j < strlen(option[0]); j++) {
+        for (int j = 0; j < strlen(option[0]); j++) {
 
             switch (option[0][j]) {
 
             case 'M':
 
-                SetBit(11, 1, 1);
+                setBit(11, 1, 1);
                 break;
 
             default:
                 snprintf(errmsg, sizeof(errmsg), "Invalid Option %c ", option[0][j]);
-                ProcessError(errmsg);
+                processError(errmsg);
             }
         }
         break;
@@ -589,10 +600,15 @@ void GenBinOption() {
     return;
 }
 
-/// @par Generate binary Instruction option part
+/// \brief Generate the binary encoding of an instruction.
+/// \details
+/// Based on the current operation type, mode, operands, and options,
+/// this function encodes the full machine instruction into binary form.
+/// Includes handling for immediates, registers, memory operands, labels,
+/// and special instructions.
 
-void GenBinInstruction() {
-    switch (OpType) {
+void genBinInstruction() {
+    switch (opInstrType) {
 
     /// @par ADD,ADC,AND,CMP,CMPU,OR,SBC,SUB,XOR
     ///     - OP<.XX> regR, value (17bitS)          ->  mode 0
@@ -611,47 +627,47 @@ void GenBinInstruction() {
     case XOR:
         if (mode == 0) {
 
-            SetGenRegister('R', opchar[0]);
-            SetBit(31, opnum[1], 18);
+            setGenRegister('R', opchar[0]);
+            setBit(31, opnum[1], 18);
         }
         else if (mode == 1) {
 
-            SetGenRegister('R', opchar[0]);
-            SetGenRegister('A', opchar[1]);
-            SetGenRegister('B', opchar[2]);
-            SetBit(13, 1,1);
-            ClrBit(15);
-            ClrBit(14); // no BYTE,HALF,WORD
+            setGenRegister('R', opchar[0]);
+            setGenRegister('A', opchar[1]);
+            setGenRegister('B', opchar[2]);
+            setBit(13, 1,1);
+            clrBit(15);
+            clrBit(14); // no BYTE,HALF,WORD
         }
         else if (mode == 2) {
 
-            SetGenRegister('R', opchar[0]);
-            SetGenRegister('A', opchar[1]);
-            SetGenRegister('B', opchar[2]);
-            SetBit(12, 1,1);
+            setGenRegister('R', opchar[0]);
+            setGenRegister('A', opchar[1]);
+            setGenRegister('B', opchar[2]);
+            setBit(12, 1,1);
         }
         else if (mode == 3) {
 
-            SetGenRegister('R', opchar[0]);
+            setGenRegister('R', opchar[0]);
             if (operandTyp[1] == OT_MEMGLOB) {
 
                 strcpy(opchar[2], "R13");
-                SetGenRegister('B', opchar[2]);
-                SetOffset(27, opnum[1], 12);
+                setGenRegister('B', opchar[2]);
+                setOffset(27, opnum[1], 12);
 
             } else if (operandTyp[1] == OT_MEMLOC) {
 
                 strcpy(opchar[2], "R15");
-                SetGenRegister('B', opchar[2]);
-                SetOffset(27, opnum[1], 12);
+                setGenRegister('B', opchar[2]);
+                setOffset(27, opnum[1], 12);
 
             } else if (operandTyp[1] == OT_VALUE) {
 
-                SetGenRegister('B', opchar[2]);
-                SetBit(27, opnum[1], 12);           // offset
+                setGenRegister('B', opchar[2]);
+                setBit(27, opnum[1], 12);           // offset
             }
-            SetBit(12, 1,1);
-            SetBit(13, 1,1);
+            setBit(12, 1,1);
+            setBit(13, 1,1);
         }
         break;
 
@@ -660,8 +676,8 @@ void GenBinInstruction() {
 
     case ADDIL:
     case LDIL:
-        SetGenRegister('R', opchar[0]);
-        SetBit(31, opnum[1], 22);
+        setGenRegister('R', opchar[0]);
+        setBit(31, opnum[1], 22);
         break;
 
     case B:
@@ -670,12 +686,12 @@ void GenBinInstruction() {
 
             if ((opnum[0] % 4) != 0) {
                 snprintf(errmsg, sizeof(errmsg), "Value %d not on word boundary", opnum[2]);
-                ProcessError(errmsg);
+                processError(errmsg);
             }
             else
             {
                 value = opnum[0] >> 2;
-                SetBit(31, value, 22);
+                setBit(31, value, 22);
             }
         }
 
@@ -683,31 +699,31 @@ void GenBinInstruction() {
             searchScopeLevel = currentScopeLevel;
             symFound = FALSE;
 
-            SearchSymLevel(currentSymSave, opchar[0], 0);
+            searchSymLevel(currentSymSave, opchar[0], 0);
             if (symFound == TRUE) {
 
                 value = symcodeAdr - codeAdr + 4;
 
                 if ((value % 4) != 0) {
                     snprintf(errmsg, sizeof(errmsg), "Label %s not on word boundary", opchar[0]);
-                    ProcessError(errmsg);
+                    processError(errmsg);
                 }
                 value = value >> 2;
-                SetBit(31, value, 22);
+                setBit(31, value, 22);
             }
             else
             {
                 snprintf(errmsg, sizeof(errmsg), "Label %s not found", opchar[2]);
-                ProcessError(errmsg);
+                processError(errmsg);
             }
         }
         if (DBG_GENBIN == TRUE) {
-            printf("B line %03d addroffset= %d\n", lineNr, value);
+            printf("B line %03d addroffset= %d\n", lineNr, (int) value);
         }
 
         if (strcmp(opchar[1], "") != 0) {
 
-            SetGenRegister('R', opchar[1]);
+            setGenRegister('R', opchar[1]);
         }
 
 
@@ -715,18 +731,18 @@ void GenBinInstruction() {
 
     case GATE:
         
-        SetGenRegister('R', opchar[0]);
+        setGenRegister('R', opchar[0]);
 
         if (operandTyp[1] == OT_VALUE) {
 
             if ((opnum[1] % 4) != 0) {
                 snprintf(errmsg, sizeof(errmsg), "Value %d not on word boundary", opnum[1]);
-                ProcessError(errmsg);
+                processError(errmsg);
             }
             else
             {
                 value = opnum[1] >> 2;
-                SetBit(31, value, 22);
+                setBit(31, value, 22);
             }
         }
 
@@ -734,35 +750,35 @@ void GenBinInstruction() {
             searchScopeLevel = currentScopeLevel;
             symFound = FALSE;
 
-            SearchSymLevel(currentSymSave, opchar[1], 0);
+            searchSymLevel(currentSymSave, opchar[1], 0);
             if (symFound == TRUE) {
                 value = symcodeAdr - codeAdr + 4;
 
 
                 if ((value % 4) != 0) {
                     snprintf(errmsg, sizeof(errmsg), "Label %s not on word boundary", opchar[1]);
-                    ProcessError(errmsg);
+                    processError(errmsg);
                 }
                 value = value >> 2;
-                SetBit(31, value, 22);
+                setBit(31, value, 22);
             }
             else
             {
                 snprintf(errmsg, sizeof(errmsg), "Label %s not found", opchar[2]);
-                ProcessError(errmsg);
+                processError(errmsg);
             }
         }
         if (DBG_GENBIN == TRUE) {
-            printf("GATE line %03d addroffset= %d\n", lineNr, value);
+            printf("GATE line %03d addroffset= %d\n", lineNr, (int) value);
         }
         break;
 
     case BR:
     case BV:
 
-        SetGenRegister('B', opchar[0]);
+        setGenRegister('B', opchar[0]);
         if (strcmp(opchar[1], "") != 0) {
-            SetGenRegister('R', opchar[1]);
+            setGenRegister('R', opchar[1]);
         }
         break;
 
@@ -770,18 +786,18 @@ void GenBinInstruction() {
     case CBR:
     case CBRU:
 
-        SetGenRegister('A', opchar[0]);
-        SetGenRegister('B', opchar[1]);
+        setGenRegister('A', opchar[0]);
+        setGenRegister('B', opchar[1]);
 
         if (operandTyp[2] == OT_VALUE) {
             if ((opnum[2] % 4) != 0) {
                 snprintf(errmsg, sizeof(errmsg), "Value %d not on word boundary", opnum[2]);               
-                ProcessError(errmsg);
+                processError(errmsg);
             }
             else
             {
                 value = opnum[2] >> 2;
-                SetBit(23, value, 16);
+                setBit(23, value, 16);
             }
         }
 
@@ -789,79 +805,79 @@ void GenBinInstruction() {
             searchScopeLevel = currentScopeLevel;
             symFound = FALSE;
 
-            SearchSymLevel(currentSymSave, opchar[2], 0);
+            searchSymLevel(currentSymSave, opchar[2], 0);
             if (symFound == TRUE) {
                 value = symcodeAdr - codeAdr + 4 ;
 
                 if ((value % 4) != 0) {
                     snprintf(errmsg, sizeof(errmsg), "Label %s not on word boundary", opchar[2]);
-                    ProcessError(errmsg);
+                    processError(errmsg);
                 }
                 value = value >> 2;
-                SetBit(23, value, 16);
+                setBit(23, value, 16);
             }
             else
             {
                 snprintf(errmsg, sizeof(errmsg), "Label %s not found", opchar[2]);
-                ProcessError(errmsg);
+                processError(errmsg);
             }
         }
         if (DBG_GENBIN) {
 
-            printf("CBR/CBRU line %03d addroffset= %d\n", lineNr, value);
+            printf("CBR/CBRU line %03d addroffset= %d\n", lineNr, (int)value);
         }
         
         break;
 
     case BVE:
-        SetGenRegister('A', opchar[0]);
-        SetGenRegister('B', opchar[1]);
+        setGenRegister('A', opchar[0]);
+        setGenRegister('B', opchar[1]);
         if (strcmp(opchar[2],"") != 0) {
 
 
-            SetGenRegister('R', opchar[2]);
+            setGenRegister('R', opchar[2]);
         }
         break;
 
     case EXTR:
 
-        SetGenRegister('R', opchar[0]);
-        SetGenRegister('B', opchar[1]);
+        setGenRegister('R', opchar[0]);
+        setGenRegister('B', opchar[1]);
         if (mode == 0) {
-            SetBit(27, opnum[2], 5);
-            SetBit(21, opnum[3], 5);
+            setBit(27, opnum[2], 5);
+            setBit(21, opnum[3], 5);
         }
         else {
-            SetBit(21, opnum[2], 5);
+            setBit(21, opnum[2], 5);
         }
         break;
 
     case DEP:
         if (mode == 0) {
 
-            SetGenRegister('R', opchar[0]);
-            SetGenRegister('B', opchar[1]);
-            SetBit(27, opnum[2], 5);
-            SetBit(21, opnum[3], 5);
+            setGenRegister('R', opchar[0]);
+            setGenRegister('B', opchar[1]);
+            setBit(27, opnum[2], 5);
+            setBit(21, opnum[3], 5);
         }
         else if (mode == 1) {
 
-            SetGenRegister('R', opchar[0]);
-            SetGenRegister('B', opchar[1]);
-            SetBit(21, opnum[2], 5);
+            setGenRegister('R', opchar[0]);
+            setGenRegister('B', opchar[1]);
+            setBit(21, opnum[2], 5);
         }
         else if (mode == 2) {
 
-            SetGenRegister('R', opchar[0]);
-            SetBit(31, opnum[1], 4);
-            SetBit(27, opnum[2], 5);
-            SetBit(21, opnum[3], 5);
+            setGenRegister('R', opchar[0]);
+            setBit(31, opnum[1], 4);
+            setBit(27, opnum[2], 5);
+            setBit(21, opnum[3], 5);
         }
         else if (mode == 3) {
 
-            SetGenRegister('R', opchar[0]);
-            SetBit(31, opnum[1], 4);
-            SetBit(21, opnum[2], 5);
+            setGenRegister('R', opchar[0]);
+            setBit(31, opnum[1], 4);
+            setBit(21, opnum[2], 5);
         }
         break;
 
@@ -869,31 +885,31 @@ void GenBinInstruction() {
     case LDR:
     case STC:
 
-        SetGenRegister('R', opchar[0]);
+        setGenRegister('R', opchar[0]);
         if (operandTyp[1] == OT_VALUE) {
-            SetBit(27, opnum[1], 12);
+            setBit(27, opnum[1], 12);
             value = opnum[0];
         }
         else if (operandTyp[1] == OT_MEMGLOB) {
 
             strcpy(opchar[2], "R13");
-            SetGenRegister('B', opchar[2]);
-            SetOffset(27, opnum[1], 12);
+            setGenRegister('B', opchar[2]);
+            setOffset(27, opnum[1], 12);
         }
         if (opchar[2][0] == 'S') {
-            value = GetSegRegister(opchar[2]);
+            value = getSegRegister(opchar[2]);
             if (value > 0 && value < 4) {
-                SetBit(13, value, 2);
+                setBit(13, value, 2);
             }
             else {
-                snprintf(errmsg, sizeof(errmsg), "Segmentregister S%d not allowed\n", value);
-                ProcessError(errmsg);
+                snprintf(errmsg, sizeof(errmsg), "Segmentregister S%d not allowed\n", (int)value);
+                processError(errmsg);
                 break;
             }
-            SetGenRegister('B', opchar[3]);
+            setGenRegister('B', opchar[3]);
         }
         else {
-            SetGenRegister('B', opchar[2]);
+            setGenRegister('B', opchar[2]);
         }
         break;
 
@@ -902,140 +918,140 @@ void GenBinInstruction() {
         if (operandTyp[0] == OT_VALUE) {
 
 
-            SetBit(23, opnum[0] >> 2, 14);
+            setBit(23, opnum[0] >> 2, 14);
 
 
-            SetGenRegister('A', opchar[1]);
-            SetGenRegister('B', opchar[2]);
+            setGenRegister('A', opchar[1]);
+            setGenRegister('B', opchar[2]);
             if (strcmp(opchar[3], "") != 0) {
 
-                SetGenRegister('R', opchar[3]);
+                setGenRegister('R', opchar[3]);
             }
         }
         break;
 
     case BRK:
         
-        SetBit(9, opnum[0], 4);
-        SetBit(31, opnum[1], 16);
+        setBit(9, opnum[0], 4);
+        setBit(31, opnum[1], 16);
 
         break;
 
     case DSR:
 
-        SetGenRegister('R', opchar[0]);
-        SetGenRegister('A', opchar[1]);
-        SetGenRegister('B', opchar[2]);
+        setGenRegister('R', opchar[0]);
+        setGenRegister('A', opchar[1]);
+        setGenRegister('B', opchar[2]);
         if (strcmp(opchar[3], "") != 0) {
-            SetBit(21, opnum[3], 5);
+            setBit(21, opnum[3], 5);
         }
         break;
 
     case SHLA:
 
-        SetGenRegister('R', opchar[0]);
-        SetGenRegister('A', opchar[1]);
-        SetGenRegister('B', opchar[2]);
-        SetBit(21, opnum[3], 2);
+        setGenRegister('R', opchar[0]);
+        setGenRegister('A', opchar[1]);
+        setGenRegister('B', opchar[2]);
+        setBit(21, opnum[3], 2);
         break;
 
     case PCA:
     case PTLB:
         
-        SetGenRegister('A', opchar[0]);
+        setGenRegister('A', opchar[0]);
         if (opchar[1][0] == 'S') {
-            value = GetSegRegister(opchar[2]);
+            value = getSegRegister(opchar[2]);
             if (value > 0 && value < 4) {
-                SetBit(13, value, 2);
+                setBit(13, value, 2);
             }
             else {
-                snprintf(errmsg, sizeof(errmsg), "Segmentregister S%d not allowed\n", value);
-                ProcessError(errmsg);
+                snprintf(errmsg, sizeof(errmsg), "Segmentregister S%d not allowed\n", (int) value);
+                processError(errmsg);
                 break;
             }
-            SetGenRegister('B', opchar[2]);
+            setGenRegister('B', opchar[2]);
         }
         else {
-            SetGenRegister('B', opchar[1]);
+            setGenRegister('B', opchar[1]);
         }
 
         break;
 
     case CMR:
 
-        SetGenRegister('R', opchar[0]);
-        SetGenRegister('A', opchar[1]);
-        SetGenRegister('B', opchar[2]);
+        setGenRegister('R', opchar[0]);
+        setGenRegister('A', opchar[1]);
+        setGenRegister('B', opchar[2]);
         break;
 
     case DIAG:
-        SetGenRegister('R', opchar[0]);
-        SetGenRegister('A', opchar[1]);
-        SetGenRegister('B', opchar[2]);
-        SetBit(13, opnum[3], 4);
+        setGenRegister('R', opchar[0]);
+        setGenRegister('A', opchar[1]);
+        setGenRegister('B', opchar[2]);
+        setBit(13, opnum[3], 4);
         break;
 
     case ITLB:
 
-        SetGenRegister('R', opchar[0]);
-        SetGenRegister('A', opchar[1]);
-        SetGenRegister('B', opchar[2]);
+        setGenRegister('R', opchar[0]);
+        setGenRegister('A', opchar[1]);
+        setGenRegister('B', opchar[2]);
         break;
 
     case LDO:
 
-        SetGenRegister('R', opchar[0]);
+        setGenRegister('R', opchar[0]);
         if (operandTyp[1] == OT_MEMGLOB) {
 
             strcpy(opchar[2], "R13");
-            SetGenRegister('B', opchar[2]);
-            SetOffset(27, opnum[1], 18);
+            setGenRegister('B', opchar[2]);
+            setOffset(27, opnum[1], 18);
 
         }
         else if (operandTyp[1] == OT_MEMLOC) {
 
             strcpy(opchar[2], "R15");
-            SetGenRegister('B', opchar[2]);
-            SetOffset(27, opnum[1], 18);
+            setGenRegister('B', opchar[2]);
+            setOffset(27, opnum[1], 18);
 
         }
         else if (operandTyp[1] == OT_VALUE) {
 
-            SetGenRegister('B', opchar[2]);
-            SetBit(27, opnum[1], 18);           // offset
+            setGenRegister('B', opchar[2]);
+            setBit(27, opnum[1], 18);           // offset
         }
         break;
 
     case LSID:
 
-        SetGenRegister('R', opchar[0]);
-        SetGenRegister('B', opchar[1]);
+        setGenRegister('R', opchar[0]);
+        setGenRegister('B', opchar[1]);
         break;
 
     case PRB:
 
-        SetGenRegister('R', opchar[0]);
+        setGenRegister('R', opchar[0]);
         if (opchar[1][0] == 'S') {
-            value = GetSegRegister(opchar[2]);
+            value = getSegRegister(opchar[2]);
             if (value > 0 && value < 4) {
-                SetBit(13, value, 2);
+                setBit(13, value, 2);
             }
             else {
-                snprintf(errmsg, sizeof(errmsg), "Segmentregister S%d not allowed\n", value);
-                ProcessError(errmsg);
+                snprintf(errmsg, sizeof(errmsg), "Segmentregister S%d not allowed\n", (int)value);
+                processError(errmsg);
                 break;
             }
-            SetGenRegister('B', opchar[2]);
+            setGenRegister('B', opchar[2]);
             if (strcmp(opchar[3], "") != 0) {
 
-                SetGenRegister('A', opchar[3]);
+                setGenRegister('A', opchar[3]);
             }
         }
         else {
-            SetGenRegister('B', opchar[1]);        
+            setGenRegister('B', opchar[1]);        
             if (strcmp(opchar[2], "") != 0) {
 
-                SetGenRegister('A', opchar[2]);
+                setGenRegister('A', opchar[2]);
             }
         }
 
@@ -1043,51 +1059,51 @@ void GenBinInstruction() {
 
     case LDPA:
 
-        SetGenRegister('R', opchar[0]);
-        SetGenRegister('A', opchar[1]);
+        setGenRegister('R', opchar[0]);
+        setGenRegister('A', opchar[1]);
         if (opchar[2][0] == 'S') {
-            value = GetSegRegister(opchar[2]);
+            value = getSegRegister(opchar[2]);
             if (value > 0 && value < 4) {
-                SetBit(13, value, 2);
+                setBit(13, value, 2);
             }
             else {
-                snprintf(errmsg, sizeof(errmsg), "Segmentregister S%d not allowed\n", value);
-                ProcessError(errmsg);
+                snprintf(errmsg, sizeof(errmsg), "Segmentregister S%d not allowed\n", (int)value);
+                processError(errmsg);
                 break;
             }
-            SetGenRegister('B', opchar[3]);
+            setGenRegister('B', opchar[3]);
         }
         else {
-            SetGenRegister('B', opchar[2]);
+            setGenRegister('B', opchar[2]);
         }
         break;
 
     case MR:
 
         if (opchar[0][0] == 'R') {
-            SetGenRegister('R', opchar[0]);
+            setGenRegister('R', opchar[0]);
         }
         else {
-            SetMRRegister(opchar[0]);
+            setMRRegister(opchar[0]);
 
         }
         if (opchar[1][0] == 'R') {
-            SetGenRegister('R', opchar[1]);
+            setGenRegister('R', opchar[1]);
         }
         else {
-            SetMRRegister(opchar[1]);
+            setMRRegister(opchar[1]);
         }
         break;
 
     case MST:
 
-        SetGenRegister('R', opchar[0]);
+        setGenRegister('R', opchar[0]);
         if (operandTyp[1] == OT_REGISTER) {
 
-            SetGenRegister('B', opchar[1]);
+            setGenRegister('B', opchar[1]);
         }
         else {
-            SetBit(31, opnum[1], 4);
+            setBit(31, opnum[1], 4);
         }
         break;
 
@@ -1099,108 +1115,123 @@ void GenBinInstruction() {
     case LD:
     case ST:
 
-        SetGenRegister('R', opchar[0]);
+        setGenRegister('R', opchar[0]);
         if (operandTyp[1] == OT_VALUE) {
-            SetBit(27, opnum[1], 12);
+            setBit(27, opnum[1], 12);
             value = opnum[0];
         }
         else if (operandTyp[1] == OT_MEMGLOB) {
 
                 strcpy(opchar[2], "R13");
-                SetGenRegister('B', opchar[2]);
-                SetOffset(27, opnum[1], 12);
+                setGenRegister('B', opchar[2]);
+                setOffset(27, opnum[1], 12);
         }
         else {
-            SetGenRegister('A', opchar[1]);
-            SetBit(10, 1, 1);
+            setGenRegister('A', opchar[1]);
+            setBit(10, 1, 1);
         }
         if (opchar[2][0] == 'S') {
-            value = GetSegRegister(opchar[2]);
+            value = getSegRegister(opchar[2]);
             if (value > 0 && value < 4) {
-                SetBit(13, value, 2);
+                setBit(13, value, 2);
             }
             else {
-                snprintf(errmsg, sizeof(errmsg), "Segmentregister S%d not allowed\n",value);
-                ProcessError(errmsg);
+                snprintf(errmsg, sizeof(errmsg), "Segmentregister S%d not allowed\n", (int)value);
+                processError(errmsg);
                 break;
             }
-            SetGenRegister('B', opchar[3]);
+            setGenRegister('B', opchar[3]);
         }
         else {
-            SetGenRegister('B', opchar[2]);
+            setGenRegister('B', opchar[2]);
         }
         break;
 
     case LDA:
     case STA:
 
-        SetGenRegister('R', opchar[0]);
+        setGenRegister('R', opchar[0]);
         if (operandTyp[1] == OT_VALUE) {
-            SetBit(27, opnum[1], 12);
+            setBit(27, opnum[1], 12);
             value = opnum[0];
         }
         else if (operandTyp[1] == OT_MEMGLOB) {
 
             strcpy(opchar[2], "R13");
-            SetGenRegister('B', opchar[2]);
-            SetOffset(27, opnum[1], 12);
+            setGenRegister('B', opchar[2]);
+            setOffset(27, opnum[1], 12);
         }
         else {
-            SetGenRegister('A', opchar[1]);
-            SetBit(10, 1, 1);
+            setGenRegister('A', opchar[1]);
+            setBit(10, 1, 1);
         }
-        SetGenRegister('B', opchar[2]);
+        setGenRegister('B', opchar[2]);
         break;
         
     default: 
         snprintf(errmsg, sizeof(errmsg), "this should not happen\n");
-        ProcessError(errmsg);
+        processError(errmsg);
         break;
     }
 
-    WriteBinary();
+    createBinary();
     bin_status = B_BIN; 
     
 }
 
-void WriteBinary() {
+/// \brief Finalize and insert a binary instruction.
+/// \details
+/// Creates or inserts a `SRCNode` representing the current binary
+/// instruction into the global source structure, depending on the
+/// current binary status (`B_BIN` or `B_BINCHILD`).
+void createBinary() {
 
     if (bin_status == B_BINCHILD) {
 
         // SRCbin = Create_SRCnode(SRC_BIN, buffer, lineNr);
 
-        Search_SRC(GlobalSRC, 0);
+        searchSRC(GlobalSRC, 0);
 
 
         SRCNode* node = (SRCNode*)malloc(sizeof(SRCNode));
 
         if (node == NULL) {
-            FatalError("malloc failed");
+            fatalError("malloc failed");
         }
         node->type = SRC_BIN;
         node->linenr = lineNr;
-        node->binstatus = bin_status;
+        node->binStatus = bin_status;
         node->binInstr = binInstr;
         node->codeAdr = codeAdr - 4;
         node->text = strdup(infmsg);
         node->children = NULL;
-        node->child_count = 0;
+        node->childCount = 0;
         SRCbin = node;
 
-        Add_SRCchild(SRCcurrent, SRCbin);
+        addSRCchild(SRCcurrent, SRCbin);
     }
     else {
         bin_status = B_BIN;
-        InsertMC_SRC(GlobalSRC, 0);
+        insertBinToSRC(GlobalSRC, 0);
     }
 
     return;
     
 }
 
-/// @par Abstract Syntax Tree durcharbeiten
+// ============================================================================
+// AST Processing
+// ============================================================================
 
-void CodeGenAST(ASTNode* node, int depth) {
+/// \brief Traverse and process the abstract syntax tree (AST).
+/// \details
+/// Recursively visits AST nodes, extracts instruction data, manages
+/// scope information, and triggers binary generation for instructions.
+/// 
+/// \param node  Pointer to the current AST node.
+/// \param depth Current traversal depth (used for recursion).
+
+void readAST(ASTNode* node, int depth) {
 
     if (!node) return;
 
@@ -1220,8 +1251,8 @@ void CodeGenAST(ASTNode* node, int depth) {
         case NODE_INSTRUCTION:  
         
             if (codeAdr > 0) {
-                GenBinOption();
-                GenBinInstruction();
+                genBinOption();
+                genBinInstruction();
             }
             codeAdr = codeAdr + 4;
             opCount = 0;
@@ -1235,7 +1266,7 @@ void CodeGenAST(ASTNode* node, int depth) {
             strcpy(option[1], "");
             currentSymSave = currentSym;
             binInstr = node->valnum;
-            lineNr = node->linenr;
+            lineNr = node->lineNr;
             break;
         
         case NODE_LABEL: break;
@@ -1246,7 +1277,7 @@ void CodeGenAST(ASTNode* node, int depth) {
             break;
 
         case NODE_OPERATION: 
-            OpType = node->valnum;
+            opInstrType = node->valnum;
             break;
         
         case NODE_OPERAND: 
@@ -1265,7 +1296,7 @@ void CodeGenAST(ASTNode* node, int depth) {
 
         default:
             snprintf(errmsg, sizeof(errmsg), "This should not happen!!");
-            ProcessError(errmsg);
+            processError(errmsg);
     }
 
 
@@ -1275,8 +1306,8 @@ void CodeGenAST(ASTNode* node, int depth) {
        
 
 
-    for (int i = 0; i < node->child_count; i++) {
-        CodeGenAST(node->children[i], depth + 1);
+    for (int i = 0; i < node->childCount; i++) {
+        readAST(node->children[i], depth + 1);
     }
 }
 

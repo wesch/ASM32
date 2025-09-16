@@ -25,7 +25,9 @@ D1:                 .DOUBLE 0x0123_4567_89ab_cdef
 AB_C1:
                     ADCH    R1,R2(R3)
                     ADC.L   R1,Foo_Bar
-                    ADC.O   StartReg,R2,W1
-
-                    ADC.L   R2,-47                                      
+                    ADC.O   StartReg,R2
+X:                  ADD     R1,R2
+                    ADC.L   R2,-47                 
+                    B       AB_C1
+                    B       X
                     .END
