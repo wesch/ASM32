@@ -32,8 +32,12 @@ extern int   mode;                            ///< Current parsing mode
 extern int64_t value;                         ///< Numeric value of current token
 extern int   align_val;                       ///< Alignment value for directives
 extern bool  lineERR;                         ///< Error status of current line
+extern int   numOfInstructions;
+extern int   numOfData;
 
 extern char  label[MAX_WORD_LENGTH];          ///< Current label name
+extern char  labelCodeOld[MAX_WORD_LENGTH];
+extern char  labelDataOld[MAX_WORD_LENGTH];
 extern int   ind;                             ///< Generic index helper
 extern int   j;                               ///< Generic counter helper
 extern char  errmsg[MAX_ERROR_LENGTH];        ///< Last error message
@@ -52,6 +56,14 @@ extern int   varType;                         ///< Variable type
 extern char  varName[MAX_WORD_LENGTH];        ///< Variable name
 extern char  buffer[255];                     ///< General-purpose buffer
 
+extern bool  codeInstrFlag;                   ///< Flag if .CODE or instruction was read in AST
+extern int   nodeTypeOld;
+
+extern bool  codeExist;                       ///< flag if a .CODE directive is present before first instruction    
+extern bool  dataExist;                       ///< flag if a .DATA directive is present before first definitin of byte,half,word etc. 
+extern int   numSegment;
+
+
 extern int   binInstr;                        ///< Current binary instruction word
 extern int   binInstrSave;                    ///< Saved binary instruction word
 extern char  opt1[MAX_WORD_LENGTH];           ///< First instruction option
@@ -68,7 +80,9 @@ extern segment* data_seg;                     ///< ELF .data segment
 extern section* note_sec;                     ///< ELF .note section
 
 extern uint32_t elfCodeAddr;                  ///< ELF code section base address
+extern uint32_t elfCodeAddrOld;
 extern uint32_t elfDataAddr;                  ///< ELF data section base address
+extern uint32_t elfDataAddrOld;
 extern uint32_t elfEntryPoint;                ///< ELF entry point address
 extern bool     elfEntryPointStatus;          ///< Status: entry point defined
 extern uint32_t elfCodeAlign;                 ///< Code section alignment
@@ -117,11 +131,13 @@ extern char            symValue[50];          ///< Value of symbol
 extern int             symcodeAdr;            ///< Code address of symbol
 
 // ============================================================================
-// AST and SRC Globals
+// AST Globals
 // ============================================================================
 
 extern struct ASTNode* ASTprogram;            ///< Root node of AST
 extern struct ASTNode* ASTinstruction;        ///< Current AST instruction node
+extern struct ASTNode* ASTdirective;
+extern struct ASTNode* ASTcode;
 extern struct ASTNode* ASToperation;          ///< AST operation node
 extern struct ASTNode* ASTop1;                ///< AST operand 1
 extern struct ASTNode* ASTop2;                ///< AST operand 2
@@ -131,6 +147,13 @@ extern struct ASTNode* ASTlabel;              ///< AST label node
 extern struct ASTNode* ASTmode;               ///< AST mode node
 extern struct ASTNode* ASTopt1;               ///< AST option 1
 extern struct ASTNode* ASTopt2;               ///< AST option 2
+extern struct ASTNode* ASTaddr;               ///< AST addr
+extern struct ASTNode* ASTalign;              ///< AST align
+extern struct ASTNode* ASTentry;              ///< AST entry
+
+// ============================================================================
+// SRC Globals
+// ============================================================================
 
 extern SRC_NodeType    currentSRC_type;       ///< Current SRC node type
 extern struct SRCNode* GlobalSRC;             ///< Root of SRC tree
@@ -212,6 +235,14 @@ struct SRCNode {
     int childCount;             ///< Number of children
 };
 
+/// \brief Segment Table.
+typedef struct {
+    char name[32];   // Name (31 chars + null terminator)
+    char type;       // Type as a single character
+    int addr;        // Address (integer)
+    int len;         // Length (integer)
+} SegmentTableEntry;
+
 // ============================================================================
 // Function Prototypes
 // ============================================================================
@@ -223,6 +254,9 @@ void printSourceListing(SRCNode* node, int depth);
 void searchSRC(SRCNode* node, int depth);
 void insertBinToSRC(SRCNode* node, int depth);
 void setDefaultDirectives();
+int addSegmentEntry(int index, const char* name, char type, int addr, int len);
+int compareByAddr(const void* a, const void* b);
+void printSegmentTable(int count);
 
 // -- utils.cpp
 void openSourceFile();
@@ -271,7 +305,7 @@ void createBinary();
 void genBinInstruction();
 void genBinOption();
 int  getSegRegister(char* regname);
-void readAST(ASTNode* node, int depth);
+void processAST(ASTNode* node, int depth);
 void setBit(int pos, int x, int num);
 void setGenRegister(int reg, char* regname);
 void setMRRegister(char* regname);
@@ -279,11 +313,11 @@ void setOffset(int pos, int x, int num);
 
 // -- ELF writer
 int createELF();
-int createTextSection();
+int createTextSection(char* name);
 int addTextSectionData();
 int createTextSegment();
 int addTextSectionToSegment();
-int createDataSection();
+int createDataSection(char* name);
 int addDataSectionData(char* data, int len);
 int createDataSegment();
 int addDataSectionToSegment();

@@ -595,11 +595,15 @@ void printAST(ASTNode* node, int depth) {
         (node->type == NODE_PROGRAM) ? "Prg" :
         (node->type == NODE_INSTRUCTION) ? "Ins" :
         (node->type == NODE_DIRECTIVE) ? "Dir" :
+        (node->type == NODE_CODE) ? "Cod" :
         (node->type == NODE_OPERATION) ? "OpC" :
         (node->type == NODE_OPERAND) ? "Op " :
         (node->type == NODE_OPTION) ? "Opt" :
         (node->type == NODE_MODE) ? "Mod" :
         (node->type == NODE_LABEL) ? "Lab" :
+        (node->type == NODE_ADDR) ? "Adr" :
+        (node->type == NODE_ALIGN) ? "Alg" :
+        (node->type == NODE_ENTRY) ? "Ent" :
         "Unknown",
         node->lineNr, node->codeAdr, node->operandType,
         node->value, (int)value, node->scopeLevel, node->scopeName);
@@ -3896,6 +3900,13 @@ void parseInstruction() {
     lineERR = FALSE;
     varType = V_VALUE;
 
+    if (codeExist == FALSE) {
+        snprintf(errmsg, sizeof(errmsg), ".CODE directive missing");
+        processError(errmsg);
+        skipToEOL();
+        return;
+    }
+
     strcpy(opCode, tokenSave);
     strToUpper(opCode);
     if (DBG_PARSER) printf("%03d I %s ", lineNr, opCode);
@@ -4114,13 +4125,44 @@ void ParseDirective() {
             }
             break;
 
+
+
         // ---------------------------------------------------------------------
         // Section definitions
         // ---------------------------------------------------------------------
 
         case D_CODE:
+
+            codeExist = TRUE;
+
             /// Defines code section attributes: ADDR, ALIGN, ENTRY.
             if (prgType == P_STANDALONE) {
+
+                // Build AST nodes for .CODE
+                ASTcode = createASTnode(NODE_CODE, "CODE", 0);
+                addASTchild(ASTprogram, ASTcode);
+                if (strcmp(label, "") != 0) {
+                    symFound = FALSE;
+                    searchScopeLevel = currentScopeLevel;
+                    searchSymLevel(scopeTab[searchScopeLevel], label, 0);
+
+                    if (!symFound) {
+                        strcpy(dirCode, "LABEL");
+                        directive = createSYMnode(SCOPE_DIRECT, label, dirCode, "", lineNr);
+                        addSYMchild(scopeTab[currentScopeLevel], directive);
+                    }
+                    else {
+                        snprintf(errmsg, sizeof(errmsg), "Label %s already defined ", label);
+                        processError(errmsg);
+                        strcpy(label, "");
+                        skipToEOL();
+                        return;
+                    }
+                    ASTlabel = createASTnode(NODE_LABEL, label, 0);
+                    addASTchild(ASTcode, ASTlabel);
+                    strcpy(label, "");
+                }
+
                 // Parse optional parameters (ADDR, ALIGN, ENTRY)
                 fetchToken();
                 strToUpper(token);
@@ -4129,6 +4171,8 @@ void ParseDirective() {
                         fetchToken();
                         elfCodeAddr = parseExpression();
                         strToUpper(token);
+                        ASTaddr = createASTnode(NODE_ADDR, "", elfCodeAddr);
+                        addASTchild(ASTcode, ASTaddr);
                     }
                     else if (strcmp(token, "ALIGN") == 0) {
                         fetchToken();
@@ -4147,6 +4191,8 @@ void ParseDirective() {
                             skipToEOL();
                             return;
                         }
+                        ASTalign = createASTnode(NODE_ALIGN, "", elfCodeAlign);
+                        addASTchild(ASTcode, ASTalign);
                     }
                     else if (strcmp(token, "ENTRY") == 0) {
                         if (elfEntryPointStatus == FALSE) {
@@ -4158,6 +4204,8 @@ void ParseDirective() {
                             skipToEOL();
                             return;
                         }
+                        ASTentry = createASTnode(NODE_ENTRY, "", 0);
+                        addASTchild(ASTcode, ASTentry);
                         fetchToken();
                     }
                     else {
@@ -4185,8 +4233,20 @@ void ParseDirective() {
             break;
 
         case D_DATA:
+
+            if (dataExist == TRUE) {
+                // add datasegment address to segment table
+                addSegmentEntry(numSegment, labelDataOld, 'D', elfDataAddrOld, numOfData);
+                numSegment++;
+                numOfData = 0;
+            }
+
+
+            dataExist = TRUE;
+
             /// Defines data section attributes: ADDR, ALIGN.
             if (prgType == P_STANDALONE) {
+
                 fetchToken();
                 strToUpper(token);
                 do {
@@ -4194,6 +4254,7 @@ void ParseDirective() {
                         fetchToken();
                         elfDataAddr = parseExpression();
                         strToUpper(token);
+
                     }
                     else if (strcmp(token, "ALIGN") == 0) {
                         fetchToken();
@@ -4211,6 +4272,7 @@ void ParseDirective() {
                             skipToEOL();
                             return;
                         }
+
                     }
                     else {
                         snprintf(errmsg, sizeof(errmsg), "Invalid Parameter %s", token);
@@ -4223,13 +4285,25 @@ void ParseDirective() {
                         strToUpper(token);
                     }
                 } while (tokTyp != T_EOL);
+
+                // create ELF structures for DATA
+                createDataSegment();
+                strcpy(buffer, ".data.");
+                strcat(buffer, label);
+                createDataSection(buffer);
+                addDataSectionToSegment();
             }
             else {
+
                 snprintf(errmsg, sizeof(errmsg), "invalid %s in Module program", token);
                 processError(errmsg);
                 skipToEOL();
                 return;
             }
+            strcpy(labelDataOld, label);
+            elfDataAddrOld = elfDataAddr;
+
+
             break;
 
         // ---------------------------------------------------------------------
@@ -4275,8 +4349,26 @@ void ParseDirective() {
         // Memory allocation and initialization
         // ---------------------------------------------------------------------
 
+
+
+            if (dataExist == FALSE) {
+                snprintf(errmsg, sizeof(errmsg), ".DATA directive missing");
+                processError(errmsg);
+                skipToEOL();
+                return;
+            }
+
+
         case D_BUFFER:
             /// Allocates and initializes a buffer in the ELF data section.
+            
+            if (dataExist == FALSE) {
+                snprintf(errmsg, sizeof(errmsg), ".DATA directive missing");
+                processError(errmsg);
+                skipToEOL();
+                return;
+            }
+            
             fetchToken();
             strToUpper(token);
             do {
@@ -4328,6 +4420,7 @@ void ParseDirective() {
 
             addDataSectionData(elfBuffer, elfDataLength);
             dataAdr = (dataAdr + elfDataLength);
+            numOfData += elfDataLength;
             break;
 
 
@@ -4340,6 +4433,13 @@ void ParseDirective() {
         // into the ELF data section in big-endian format.
 
         case D_BYTE:
+
+            if (dataExist == FALSE) {
+                snprintf(errmsg, sizeof(errmsg), ".DATA directive missing");
+                processError(errmsg);
+                skipToEOL();
+                return;
+            }
 
             if ((currentScopeLevel == SCOPE_MODULE) || (currentScopeLevel == SCOPE_PROGRAM)) {
                 varType = V_MEMGLOBAL;
@@ -4376,10 +4476,18 @@ void ParseDirective() {
             if ((dataAdr % 1) == 0) {
                 dataAdr = (dataAdr + 1);
             }
+            numOfData += 1;
             break;
 
 
         case D_HALF:
+
+            if (dataExist == FALSE) {
+                snprintf(errmsg, sizeof(errmsg), ".DATA directive missing");
+                processError(errmsg);
+                skipToEOL();
+                return;
+            }
 
             if ((currentScopeLevel == SCOPE_MODULE) || (currentScopeLevel == SCOPE_PROGRAM)) {
                 varType = V_MEMGLOBAL;
@@ -4426,9 +4534,17 @@ void ParseDirective() {
             if ((dataAdr % 2) == 0) {
                 dataAdr = (dataAdr + 2);
             }
+            numOfData += 2;
             break;
 
         case D_WORD:
+
+            if (dataExist == FALSE) {
+                snprintf(errmsg, sizeof(errmsg), ".DATA directive missing");
+                processError(errmsg);
+                skipToEOL();
+                return;
+            }
 
             if ((currentScopeLevel == SCOPE_MODULE) || (currentScopeLevel == SCOPE_PROGRAM)) {
                 varType = V_MEMGLOBAL;
@@ -4478,9 +4594,17 @@ void ParseDirective() {
             if ((dataAdr % 4) == 0) {
                 dataAdr = (dataAdr + 4);
             }
+            numOfData += 4;
             break;
 
         case D_DOUBLE:
+
+            if (dataExist == FALSE) {
+                snprintf(errmsg, sizeof(errmsg), ".DATA directive missing");
+                processError(errmsg);
+                skipToEOL();
+                return;
+            }
 
             if ((currentScopeLevel == SCOPE_MODULE) || (currentScopeLevel == SCOPE_PROGRAM)) {
                 varType = V_MEMGLOBAL;
@@ -4534,10 +4658,18 @@ void ParseDirective() {
             if ((dataAdr % 8) == 0) {
                 dataAdr = (dataAdr + 8);
             }
+            numOfData += 8;
             break;
 
         case D_STRING:
             
+            if (dataExist == FALSE) {
+                snprintf(errmsg, sizeof(errmsg), ".DATA directive missing");
+                processError(errmsg);
+                skipToEOL();
+                return;
+            }
+
             fetchToken();
 
             // Align on word boundary
@@ -4560,12 +4692,12 @@ void ParseDirective() {
             // adjust data address
             
             dataAdr = (dataAdr + elfDataLength);
-
+            numOfData += elfDataLength;
             break;
 
         case D_END:
-                /// Marks end of program input (no action required here).
-                break;
+
+            break;
 
         } // end switch
     strcpy(label, "");

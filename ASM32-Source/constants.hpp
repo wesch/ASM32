@@ -24,7 +24,7 @@
 #define TRUE 1
 #define FALSE 0
 
-#define VERSION "A.00.1.12"
+#define VERSION "A.00.1.18"
 
 
 // -----------------------------------------------------------------------------
@@ -37,7 +37,7 @@
 #define MAX_WORD_LENGTH 32       ///< Maximum length of an identifier or symbol.
 #define MAX_ERROR_LENGTH 255     ///< Maximum length of an error message.
 #define MAX_TOKEN_PER_LINE 20    ///< Maximum number of tokens per source line.
-
+#define MAX_ENTRIES 255          ///< Max # of entries in segment table
 
 // -----------------------------------------------------------------------------
 // File extensions
@@ -121,6 +121,7 @@ typedef enum {
     NODE_PROGRAM,          ///< Root node representing a complete program.
     NODE_INSTRUCTION,      ///< An instruction node.
     NODE_DIRECTIVE,        ///< An assembler directive node.
+    NODE_CODE,             ///< directive CODE
     NODE_OPERATION,        ///< An operation node within an instruction.
     NODE_OPERAND,          ///< An operand node.
     NODE_OPTION,           ///< An option or modifier node.
@@ -128,7 +129,10 @@ typedef enum {
     NODE_DATA_DECLARATION, ///< Data declaration node (e.g., .BYTE, .WORD).
     NODE_EXPRESSION,       ///< An expression node.
     NODE_CONSTANT,         ///< Constant value node.
-    NODE_LABEL             ///< Label node.
+    NODE_LABEL,            ///< Label node.
+    NODE_ADDR,             ///< Addr .CODE .DATA adresse in value
+    NODE_ALIGN,            ///< Align in value
+    NODE_ENTRY             ///< Entry point
 } AST_NodeType;
 
 

@@ -47,8 +47,8 @@ int createELF() {
 /// The `.text` section holds machine instructions and is marked
 /// as executable and allocated in memory.
 /// \return 0 on success.
-int createTextSection() {
-    text_sec = writer.sections.add(".text");
+int createTextSection(char* name) {
+    text_sec = writer.sections.add(name);
     text_sec->set_type(SHT_PROGBITS);
     text_sec->set_flags(SHF_ALLOC | SHF_EXECINSTR);
     text_sec->set_addr_align(0x10);
@@ -103,8 +103,8 @@ int addTextSectionToSegment() {
 /// The `.data` section holds initialized global and static data.
 /// It is marked as writable and allocated in memory.
 /// \return 0 on success.
-int createDataSection() {
-    data_sec = writer.sections.add(".data");
+int createDataSection(char* name) {
+    data_sec = writer.sections.add(name);
     data_sec->set_type(SHT_PROGBITS);
     data_sec->set_flags(SHF_ALLOC | SHF_WRITE);
     data_sec->set_addr_align(0x4);

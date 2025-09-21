@@ -629,6 +629,10 @@ void genBinInstruction() {
 
             setGenRegister('R', opchar[0]);
             setBit(31, opnum[1], 18);
+            // no BYTE,HALF,WORD
+            clrBit(15);
+            clrBit(14);
+            setBit(31, opnum[1], 18);
         }
         else if (mode == 1) {
 
@@ -636,8 +640,10 @@ void genBinInstruction() {
             setGenRegister('A', opchar[1]);
             setGenRegister('B', opchar[2]);
             setBit(13, 1,1);
+            // no BYTE,HALF,WORD
             clrBit(15);
-            clrBit(14); // no BYTE,HALF,WORD
+            clrBit(14);
+            setBit(31, opnum[1], 18);
         }
         else if (mode == 2) {
 
@@ -1175,6 +1181,12 @@ void genBinInstruction() {
     }
 
     createBinary();
+    elfCode[0] = (binInstr >> 24) & 0xFF;
+    elfCode[1] = (binInstr >> 16) & 0xFF;
+    elfCode[2] = (binInstr >> 8) & 0xFF;
+    elfCode[3] = binInstr & 0xFF;
+    addTextSectionData();
+    numOfInstructions++;
     bin_status = B_BIN; 
     
 }
@@ -1231,7 +1243,7 @@ void createBinary() {
 /// \param node  Pointer to the current AST node.
 /// \param depth Current traversal depth (used for recursion).
 
-void readAST(ASTNode* node, int depth) {
+void processAST(ASTNode* node, int depth) {
 
     if (!node) return;
 
@@ -1249,10 +1261,29 @@ void readAST(ASTNode* node, int depth) {
             break;
         
         case NODE_INSTRUCTION:  
-        
-            if (codeAdr > 0) {
-                genBinOption();
-                genBinInstruction();
+
+            if (codeInstrFlag == TRUE ) {
+                if (nodeTypeOld == NODE_INSTRUCTION) {
+                    genBinOption();
+                    genBinInstruction();
+
+                }
+                else if (nodeTypeOld == NODE_CODE) {
+                    // create ELF structure
+                    createTextSegment();
+                    strcpy(buffer, ".text.");
+                    strcat(buffer, label);
+                    createTextSection(buffer);
+                    addTextSectionToSegment();
+
+                    // add textsegment address to segment table
+                    addSegmentEntry(numSegment, labelCodeOld, 'T', elfCodeAddrOld, numOfInstructions * 4);
+                    numSegment++;
+                    numOfInstructions = 0;
+                    elfCodeAddrOld = elfCodeAddr;
+                    strcpy(labelCodeOld, label);
+                    codeExist = TRUE;
+                }
             }
             codeAdr = codeAdr + 4;
             opCount = 0;
@@ -1262,14 +1293,71 @@ void readAST(ASTNode* node, int depth) {
                 strcpy(opchar[i], "");
                 opnum[i] = 0;
             }
+            nodeTypeOld = node->type;
+
             strcpy(option[0], "");
             strcpy(option[1], "");
             currentSymSave = currentSym;
             binInstr = node->valnum;
             lineNr = node->lineNr;
+            codeInstrFlag = TRUE;
+            break;
+
+
+        case NODE_CODE:
+            if (codeInstrFlag == TRUE) {
+
+                if (nodeTypeOld == NODE_INSTRUCTION) {
+
+                    genBinOption();
+                    genBinInstruction();
+                }
+                else if (nodeTypeOld == NODE_CODE) {
+
+                    // create ELF structure
+                    createTextSegment();
+                    strcpy(buffer, ".text.");
+                    strcat(buffer, label);
+                    createTextSection(buffer);
+                    addTextSectionToSegment();
+
+
+
+                    // add textsegment address to segment table
+                    addSegmentEntry(numSegment, labelCodeOld, 'T', elfCodeAddrOld, numOfInstructions*4);
+                    elfCodeAddrOld = elfCodeAddr;
+                    strcpy(labelCodeOld, label);
+                    numSegment++;
+                    numOfInstructions = 0;
+                    codeExist = TRUE;
+                }
+
+             }
+            nodeTypeOld = node->type;
+            codeInstrFlag = TRUE;
             break;
         
-        case NODE_LABEL: break;
+        case NODE_ADDR:
+            elfCodeAddr = node->valnum;
+
+            break;
+
+        case NODE_ALIGN:
+            elfCodeAlign = node->valnum;
+            break;
+
+        case NODE_ENTRY:
+            elfEntryPoint = elfCodeAddr;
+            break;
+
+        case NODE_LABEL: 
+            strcpy(label, node->value);
+
+            break;
+
+
+        case NODE_DIRECTIVE:
+            break;
     
         case NODE_OPTION: 
             strcpy(option[optCount], node->value);
@@ -1307,7 +1395,7 @@ void readAST(ASTNode* node, int depth) {
 
 
     for (int i = 0; i < node->childCount; i++) {
-        readAST(node->children[i], depth + 1);
+        processAST(node->children[i], depth + 1);
     }
 }
 

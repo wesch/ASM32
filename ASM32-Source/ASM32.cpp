@@ -15,7 +15,7 @@
 
 #include "constants.hpp"
 #include "ASM32.hpp"
-
+#include <elfio/elfio_dump.hpp>
 
 // --------------------------------------------------------------------------------
 //      Global variables
@@ -35,6 +35,8 @@ int         align_val;                      ///< Alignment value for directives 
 int         mode;                           ///< Mode for arithmetic or addressing operations.
 bool        lineERR;                        ///< Flag: true if the current line is in error.
 char        label[MAX_WORD_LENGTH];         ///< Most recent label text.
+char        labelCodeOld[MAX_WORD_LENGTH];
+char        labelDataOld[MAX_WORD_LENGTH];
 int         ind = 0;                        ///< Scanner index into the source line during tokenization.
 char        opCode[MAX_WORD_LENGTH];        ///< Opcode mnemonic.
 int         opInstrType;                    ///< Opcode type (maps to opCodeTab[].instrType).
@@ -47,6 +49,14 @@ char        varName[MAX_WORD_LENGTH];       ///< Name of a global/local variable
 char        buffer[255];                    ///< General-purpose text buffer.
 int         symcodeAdr;                     ///< Code address associated with a symbol table entry.
 int         bin_status;                     ///< Binary status for instructions stored in SRC nodes.
+int         numOfInstructions=0;              ///< counter # of instruction bytes in segment
+int         numOfData;                      ///< counter # of data bytes in segment
+
+bool        codeInstrFlag = FALSE;          ///< Flag if .CODE or instruction was read in AST
+int         nodeTypeOld;                     ///< old node type 
+bool        codeExist = FALSE;              ///< flag if a .CODE directive is present before first instruction    
+bool        dataExist = FALSE;              ///< flag if a .DATA directive is present before first definitin of byte,half,word etc.    
+int         numSegment = 0;                 ///< counter of segments for segment table
 
 char        errmsg[MAX_ERROR_LENGTH];       ///< Last error message text.
 char        infmsg[MAX_ERROR_LENGTH];       ///< Informational message (e.g., emitted by codegen).
@@ -61,7 +71,9 @@ int         codeAdr;                        ///< Code address (text section addr
 int         dataAdr;                        ///< Data address (data section address counter).
 
 uint32_t    elfCodeAddr;                    ///< ELF: base virtual address of the text section.
+uint32_t    elfCodeAddrOld;
 uint32_t    elfDataAddr;                    ///< ELF: base virtual address of the data section.
+uint32_t    elfDataAddrOld;
 uint32_t    elfEntryPoint;                  ///< ELF: program entry point address.
 uint32_t    elfCodeAlign;                   ///< ELF: alignment for the text section.
 uint32_t    elfDataAlign;                   ///< ELF: alignment for the data section.
@@ -95,7 +107,8 @@ bool DBG_TOKEN = FALSE;  ///< Dump tokens produced by the lexer.
 bool DBG_PARSER = FALSE; ///< Trace parser decisions.
 bool DBG_GENBIN = FALSE; ///< Trace binary generation.
 bool DBG_SYMTAB = TRUE;  ///< Dump symbol table after codegen.
-bool DBG_AST = FALSE;    ///< Dump abstract syntax tree after parsing.
+bool DBG_AST = FALSE;     ///< Dump abstract syntax tree after parsing.
+bool DBG_SEGMENT = TRUE; ///< Dump segment table
 bool DBG_SOURCE = TRUE;  ///< Print source listing with addresses and binary.
 
 // --------------------------------------------------------------------------------
@@ -144,6 +157,8 @@ char        symValue[50];                   ///< Symbol value stored in the symb
 
 ASTNode* ASTprogram = NULL;
 ASTNode* ASTinstruction = NULL;
+ASTNode* ASTdirective = NULL;
+ASTNode* ASTcode = NULL;
 ASTNode* ASToperation = NULL;
 ASTNode* ASTop1 = NULL;
 ASTNode* ASTop2 = NULL;
@@ -153,6 +168,10 @@ ASTNode* ASTlabel = NULL;
 ASTNode* ASTmode = NULL;
 ASTNode* ASTopt1 = NULL;
 ASTNode* ASTopt2 = NULL;
+ASTNode* ASTaddr = NULL;
+ASTNode* ASTalign = NULL;
+ASTNode* ASTentry = NULL;
+
 
 // --------------------------------------------------------------------------------
 /** \name Source and messages
@@ -174,7 +193,48 @@ SRCNode* SRCcurrent = NULL;                 ///< Scratch pointer used when updat
 //      Subroutines
 // --------------------------------------------------------------------------------
 
+SegmentTableEntry table[MAX_ENTRIES];
 
+// --------------------------------------------------------------------------------
+//      Subroutines
+// --------------------------------------------------------------------------------
+
+// Function to add a segment table entry
+int  addSegmentEntry(int index, const char* name, char type, int addr, int len) {
+    if (index < 0 || index >= MAX_ENTRIES) {
+        return -1; // Out of bounds
+    }
+    strncpy(table[index].name, name, sizeof(table[index].name) - 1);
+    table[index].name[sizeof(table[index].name) - 1] = '\0'; // Ensure null termination
+
+    table[index].type = type;
+    table[index].addr = addr;
+    table[index].len = len;
+    return 0;
+}
+
+// Comparison function for qsort (ascending by addr)
+int compareByAddr(const void* a, const void* b) {
+    const SegmentTableEntry* entryA = (const SegmentTableEntry*)a;
+    const SegmentTableEntry* entryB = (const SegmentTableEntry*)b;
+
+    return (entryA->addr - entryB->addr);
+}
+
+// Print the segment table
+void printSegmentTable(int count) {
+    printf("%-16s %-4s %-10s %-10s %-10s\n", "Name", "Type", "StartAddr", "EndAddr", "Len");
+    printf("--------------------------------------------------------------------------------------\n");
+
+    for (int i = 1; i < count; i++) {
+        printf("%-16s %-4c %08x   %08x   %-10d\n",
+            table[i].name,
+            table[i].type,
+            table[i].addr,
+            table[i].addr + table[i].len,
+            table[i].len);
+    }
+}
 
 // --------------------------------------------------------------------------------
 //      Set default EQU and REG
@@ -364,6 +424,7 @@ void printSourceListing(SRCNode* node, int depth) {
 /// \param node Subtree root to read from.
 /// \param depth Current recursion depth (informational).
 void copyToELF(SRCNode* node, int depth) {
+    return;
 
     if (!node) return;
 
@@ -486,12 +547,7 @@ int main(int argc, char** argv) {
     //  Prepare ELF output
     // --------------------------------------------------------------------------------
     createELF();
-    createTextSegment();
-    createTextSection();
-    addTextSectionData();
 
-    createDataSegment();
-    createDataSection();
     elfDataSectionStatus = FALSE;
     elfCodeSectionStatus = FALSE;
 
@@ -583,7 +639,15 @@ int main(int argc, char** argv) {
     binInstr = 0;
     codeAdr = 0;
 
-    readAST(ASTprogram, 0);
+    processAST(ASTprogram, 0);
+
+    addSegmentEntry(numSegment, labelDataOld, 'D', elfDataAddrOld, numOfData);
+    numSegment++;
+    
+    addSegmentEntry(numSegment, labelCodeOld, 'T', elfCodeAddrOld, numOfInstructions * 4);
+    numSegment++;
+    
+
 
     if (DBG_SYMTAB == TRUE) {
         printf("\n\n+------------------------------------------------------------------------------------+\n");
@@ -596,13 +660,35 @@ int main(int argc, char** argv) {
     }
 
     if (DBG_AST == TRUE) {
-        printf("\n\n+--------------------------------------------------------------------------+\n");
-        printf("|                               SYNTAX TREE                                |\n");
-        printf("+--------------------------------------------------------------------------+\n");
+        printf("\n\n+------------------------------------------------------------------------------------+\n");
+        printf("|                               SYNTAX TREE                                          |\n");
+        printf("+------------------------------------------------------------------------------------+\n");
         printf("Node  \tlineNr\tCAdr OpT ValueC\tValNum\tScpL\tScpN\n");
         printf("+--------------------------------------------------------------------------+\n");
 
         printAST(ASTprogram, 0);
+    }
+
+    
+    qsort(table, numSegment, sizeof(SegmentTableEntry), compareByAddr);
+
+    // Check Segment table for overlap
+    for (int i = 1; i < numSegment -1; i++) {
+        if ((table[i].addr + table[i].len) > table[i + 1].addr) {
+            snprintf(errmsg, sizeof(errmsg), "Segment %s overlaps with segment %s", table[i].name, table[i+1].name);
+            processError(errmsg);
+
+        }
+    }
+
+
+
+    if (DBG_SEGMENT == TRUE) {
+        printf("\n\n+-----------------------------------------------------------------------------------+\n");
+        printf("|                               SEGMENT Table                                       |\n");
+        printf("+-----------------------------------------------------------------------------------+\n");
+
+        printSegmentTable(numSegment);
     }
 
     if (DBG_SOURCE == TRUE) {
@@ -616,7 +702,7 @@ int main(int argc, char** argv) {
         printSourceListing(GlobalSRC, 0);
     }
 
-    copyToELF(GlobalSRC, 0);
+    
 
     closeSourceFile();
 
@@ -624,11 +710,30 @@ int main(int argc, char** argv) {
     //  Finalize ELF output
     // --------------------------------------------------------------------------------
 
-
-    addDataSectionToSegment();
-    addTextSectionToSegment();
     addNote();
     writeElfFile();
+
+    printf("\n\n+------------------------------------------------------------------------------------+\n");
+    printf("|                           ELF FILE                                         |\n");
+    printf("+------------------------------------------------------------------------------------+ \n");
+
+    elfio reader;
+
+    if (!reader.load("ASM32.out")) {
+        printf("File %s is not found or it is not an ELF file\n", argv[1]);
+        return 1;
+    }
+
+    dump::header(std::cout, reader);
+    dump::section_headers(std::cout, reader);
+    dump::segment_headers(std::cout, reader);
+    dump::symbol_tables(std::cout, reader);
+    dump::notes(std::cout, reader);
+    dump::modinfo(std::cout, reader);
+    dump::dynamic_tags(std::cout, reader);
+    dump::section_datas(std::cout, reader);
+    dump::segment_datas(std::cout, reader);
+
 
     exit(0);
 
