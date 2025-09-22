@@ -635,10 +635,16 @@ void genBinInstruction() {
             setBit(31, opnum[1], 18);
         }
         else if (mode == 1) {
-
-            setGenRegister('R', opchar[0]);
-            setGenRegister('A', opchar[1]);
-            setGenRegister('B', opchar[2]);
+            if (opchar[0] == opchar[2]) {
+                setGenRegister('R', opchar[0]);
+                setGenRegister('B', opchar[1]);
+                setGenRegister('A', opchar[2]);
+            }
+            else {
+                setGenRegister('R', opchar[0]);
+                setGenRegister('A', opchar[1]);
+                setGenRegister('B', opchar[2]);
+            }
             setBit(13, 1,1);
             // no BYTE,HALF,WORD
             clrBit(15);
@@ -1280,6 +1286,7 @@ void processAST(ASTNode* node, int depth) {
                     addSegmentEntry(numSegment, labelCodeOld, 'T', elfCodeAddrOld, numOfInstructions * 4);
                     numSegment++;
                     numOfInstructions = 0;
+                    codeAdr = 0;
                     elfCodeAddrOld = elfCodeAddr;
                     strcpy(labelCodeOld, label);
                     codeExist = TRUE;
@@ -1328,6 +1335,7 @@ void processAST(ASTNode* node, int depth) {
                     elfCodeAddrOld = elfCodeAddr;
                     strcpy(labelCodeOld, label);
                     numSegment++;
+                    codeAdr = 0;
                     numOfInstructions = 0;
                     codeExist = TRUE;
                 }

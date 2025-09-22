@@ -6,6 +6,13 @@
 
                     .GLOBAL 
 CODE1:              .CODE addr=0x0000_0020,align=0x0000_0010,entry
+                    
+
+                    ADD R1,R2,R3
+                    ADD R4,R5
+
+
+
                     ADCH    R1,R2(R3)
 
 DATA1:              .DATA addr=0x0000_0030,align=0x0000_0010
