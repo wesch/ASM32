@@ -635,7 +635,8 @@ void genBinInstruction() {
             setBit(31, opnum[1], 18);
         }
         else if (mode == 1) {
-            if (opchar[0] == opchar[2]) {
+ 
+            if (strcmp(opchar[0],opchar[2]) == 0) {
                 setGenRegister('R', opchar[0]);
                 setGenRegister('B', opchar[1]);
                 setGenRegister('A', opchar[2]);
