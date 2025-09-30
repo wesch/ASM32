@@ -51,42 +51,42 @@ build cmake_object_order_depends_target_ASM32: phony || .
 
 build CMakeFiles/ASM32.dir/ASM32-Source/ASM32.cpp.o: CXX_COMPILER__ASM32_unscanned_Debug /Users/helmutfieres/GitHub/ASM32/ASM32-Source/ASM32.cpp || cmake_object_order_depends_target_ASM32
   DEP_FILE = CMakeFiles/ASM32.dir/ASM32-Source/ASM32.cpp.o.d
-  FLAGS = -g -std=gnu++20 -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-gnu-anonymous-struct -Wnested-anon-types
+  FLAGS = -g -std=gnu++20 -arch arm64 -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-gnu-anonymous-struct -Wnested-anon-types
   INCLUDES = -I/Users/helmutfieres/GitHub/ASM32/ASM32-Source
   OBJECT_DIR = CMakeFiles/ASM32.dir
   OBJECT_FILE_DIR = CMakeFiles/ASM32.dir/ASM32-Source
 
 build CMakeFiles/ASM32.dir/ASM32-Source/ELFWriter.cpp.o: CXX_COMPILER__ASM32_unscanned_Debug /Users/helmutfieres/GitHub/ASM32/ASM32-Source/ELFWriter.cpp || cmake_object_order_depends_target_ASM32
   DEP_FILE = CMakeFiles/ASM32.dir/ASM32-Source/ELFWriter.cpp.o.d
-  FLAGS = -g -std=gnu++20 -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-gnu-anonymous-struct -Wnested-anon-types
+  FLAGS = -g -std=gnu++20 -arch arm64 -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-gnu-anonymous-struct -Wnested-anon-types
   INCLUDES = -I/Users/helmutfieres/GitHub/ASM32/ASM32-Source
   OBJECT_DIR = CMakeFiles/ASM32.dir
   OBJECT_FILE_DIR = CMakeFiles/ASM32.dir/ASM32-Source
 
 build CMakeFiles/ASM32.dir/ASM32-Source/utils.cpp.o: CXX_COMPILER__ASM32_unscanned_Debug /Users/helmutfieres/GitHub/ASM32/ASM32-Source/utils.cpp || cmake_object_order_depends_target_ASM32
   DEP_FILE = CMakeFiles/ASM32.dir/ASM32-Source/utils.cpp.o.d
-  FLAGS = -g -std=gnu++20 -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-gnu-anonymous-struct -Wnested-anon-types
+  FLAGS = -g -std=gnu++20 -arch arm64 -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-gnu-anonymous-struct -Wnested-anon-types
   INCLUDES = -I/Users/helmutfieres/GitHub/ASM32/ASM32-Source
   OBJECT_DIR = CMakeFiles/ASM32.dir
   OBJECT_FILE_DIR = CMakeFiles/ASM32.dir/ASM32-Source
 
 build CMakeFiles/ASM32.dir/ASM32-Source/lexer.cpp.o: CXX_COMPILER__ASM32_unscanned_Debug /Users/helmutfieres/GitHub/ASM32/ASM32-Source/lexer.cpp || cmake_object_order_depends_target_ASM32
   DEP_FILE = CMakeFiles/ASM32.dir/ASM32-Source/lexer.cpp.o.d
-  FLAGS = -g -std=gnu++20 -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-gnu-anonymous-struct -Wnested-anon-types
+  FLAGS = -g -std=gnu++20 -arch arm64 -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-gnu-anonymous-struct -Wnested-anon-types
   INCLUDES = -I/Users/helmutfieres/GitHub/ASM32/ASM32-Source
   OBJECT_DIR = CMakeFiles/ASM32.dir
   OBJECT_FILE_DIR = CMakeFiles/ASM32.dir/ASM32-Source
 
 build CMakeFiles/ASM32.dir/ASM32-Source/codegen.cpp.o: CXX_COMPILER__ASM32_unscanned_Debug /Users/helmutfieres/GitHub/ASM32/ASM32-Source/codegen.cpp || cmake_object_order_depends_target_ASM32
   DEP_FILE = CMakeFiles/ASM32.dir/ASM32-Source/codegen.cpp.o.d
-  FLAGS = -g -std=gnu++20 -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-gnu-anonymous-struct -Wnested-anon-types
+  FLAGS = -g -std=gnu++20 -arch arm64 -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-gnu-anonymous-struct -Wnested-anon-types
   INCLUDES = -I/Users/helmutfieres/GitHub/ASM32/ASM32-Source
   OBJECT_DIR = CMakeFiles/ASM32.dir
   OBJECT_FILE_DIR = CMakeFiles/ASM32.dir/ASM32-Source
 
 build CMakeFiles/ASM32.dir/ASM32-Source/parser.cpp.o: CXX_COMPILER__ASM32_unscanned_Debug /Users/helmutfieres/GitHub/ASM32/ASM32-Source/parser.cpp || cmake_object_order_depends_target_ASM32
   DEP_FILE = CMakeFiles/ASM32.dir/ASM32-Source/parser.cpp.o.d
-  FLAGS = -g -std=gnu++20 -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-gnu-anonymous-struct -Wnested-anon-types
+  FLAGS = -g -std=gnu++20 -arch arm64 -Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-gnu-anonymous-struct -Wnested-anon-types
   INCLUDES = -I/Users/helmutfieres/GitHub/ASM32/ASM32-Source
   OBJECT_DIR = CMakeFiles/ASM32.dir
   OBJECT_FILE_DIR = CMakeFiles/ASM32.dir/ASM32-Source
@@ -100,7 +100,7 @@ build CMakeFiles/ASM32.dir/ASM32-Source/parser.cpp.o: CXX_COMPILER__ASM32_unscan
 # Link the executable /Users/helmutfieres/GitHub/ASM32/bin/ASM32
 
 build /Users/helmutfieres/GitHub/ASM32/bin/ASM32: CXX_EXECUTABLE_LINKER__ASM32_Debug CMakeFiles/ASM32.dir/ASM32-Source/ASM32.cpp.o CMakeFiles/ASM32.dir/ASM32-Source/ELFWriter.cpp.o CMakeFiles/ASM32.dir/ASM32-Source/utils.cpp.o CMakeFiles/ASM32.dir/ASM32-Source/lexer.cpp.o CMakeFiles/ASM32.dir/ASM32-Source/codegen.cpp.o CMakeFiles/ASM32.dir/ASM32-Source/parser.cpp.o
-  FLAGS = -g -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk
+  FLAGS = -g -arch arm64
   OBJECT_DIR = CMakeFiles/ASM32.dir
   POST_BUILD = :
   PRE_LINK = :
