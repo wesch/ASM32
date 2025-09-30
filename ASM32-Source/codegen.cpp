@@ -54,11 +54,11 @@ void clrBit(int pos) {
 /// \param pos Position in the instruction.
 /// \param x   Offset value.
 /// \param num Number of bits available for encoding.
-void setOffset(int pos, int x, int num) {
-    
+void setOffset(int pos, int x, int len) {
+    int num;
 //   x = 4096;   // Test for large offset
     
-    int limit = pow(2, num);
+    int limit = pow(2, len);
     if (x > (limit - 1) ||
         x < (-limit)) {
         // aktuelle Instruction speichern
@@ -82,8 +82,9 @@ void setOffset(int pos, int x, int num) {
 
         opnum[1] = 0;
     }
-    num = x & 0x3FF;
-    setBit(26, num, 11);
+    int mask = pow(2, len) - 1;
+    num = (x & mask);
+    setBit(27, num, len);
 
 
 }
@@ -664,7 +665,7 @@ void genBinInstruction() {
             setGenRegister('R', opchar[0]);
             if (operandTyp[1] == OT_MEMGLOB) {
 
-                strcpy(opchar[2], "R13");
+                strcpy(opchar[2], baseRegData);
                 setGenRegister('B', opchar[2]);
                 setOffset(27, opnum[1], 12);
 
@@ -843,6 +844,7 @@ void genBinInstruction() {
         break;
 
     case BVE:
+
         setGenRegister('A', opchar[0]);
         setGenRegister('B', opchar[1]);
         if (strcmp(opchar[2],"") != 0) {
@@ -866,6 +868,7 @@ void genBinInstruction() {
         break;
 
     case DEP:
+
         if (mode == 0) {
 
             setGenRegister('R', opchar[0]);
@@ -905,7 +908,7 @@ void genBinInstruction() {
         }
         else if (operandTyp[1] == OT_MEMGLOB) {
 
-            strcpy(opchar[2], "R13");
+            strcpy(opchar[2], baseRegData);
             setGenRegister('B', opchar[2]);
             setOffset(27, opnum[1], 12);
         }
@@ -998,6 +1001,7 @@ void genBinInstruction() {
         break;
 
     case DIAG:
+
         setGenRegister('R', opchar[0]);
         setGenRegister('A', opchar[1]);
         setGenRegister('B', opchar[2]);
@@ -1016,7 +1020,7 @@ void genBinInstruction() {
         setGenRegister('R', opchar[0]);
         if (operandTyp[1] == OT_MEMGLOB) {
 
-            strcpy(opchar[2], "R13");
+            strcpy(opchar[2], baseRegData);
             setGenRegister('B', opchar[2]);
             setOffset(27, opnum[1], 18);
 
@@ -1135,9 +1139,9 @@ void genBinInstruction() {
         }
         else if (operandTyp[1] == OT_MEMGLOB) {
 
-                strcpy(opchar[2], "R13");
-                setGenRegister('B', opchar[2]);
-                setOffset(27, opnum[1], 12);
+            strcpy(opchar[2], baseRegData);
+            setGenRegister('B', opchar[2]);
+            setOffset(27, opnum[1], 12);
         }
         else {
             setGenRegister('A', opchar[1]);
@@ -1170,7 +1174,7 @@ void genBinInstruction() {
         }
         else if (operandTyp[1] == OT_MEMGLOB) {
 
-            strcpy(opchar[2], "R13");
+            strcpy(opchar[2], baseRegData);
             setGenRegister('B', opchar[2]);
             setOffset(27, opnum[1], 12);
         }
@@ -1259,9 +1263,10 @@ void processAST(ASTNode* node, int depth) {
 
     SymNode* currentSym = node->symNodeAdr;
     
-
+    codeAdr = node->codeAdr;
 
     switch (node->type) {
+
 
         case NODE_PROGRAM: 
         
@@ -1287,7 +1292,7 @@ void processAST(ASTNode* node, int depth) {
                     addSegmentEntry(numSegment, labelCodeOld, 'T', elfCodeAddrOld, numOfInstructions * 4);
                     numSegment++;
                     numOfInstructions = 0;
-                    codeAdr = 0;
+                    // codeAdr = 0;
                     elfCodeAddrOld = elfCodeAddr;
                     strcpy(labelCodeOld, label);
                     codeExist = TRUE;
@@ -1336,7 +1341,7 @@ void processAST(ASTNode* node, int depth) {
                     elfCodeAddrOld = elfCodeAddr;
                     strcpy(labelCodeOld, label);
                     numSegment++;
-                    codeAdr = 0;
+                    // codeAdr = 0;
                     numOfInstructions = 0;
                     codeExist = TRUE;
                 }
@@ -1382,6 +1387,7 @@ void processAST(ASTNode* node, int depth) {
             strcpy(opchar[opCount], node->value);
             opnum[opCount] = node->valnum;
             operandTyp[opCount] = node->operandType;
+            strcpy(baseRegData, node->basereg);
             opCount++;
             break;
         

@@ -25,6 +25,8 @@ extern char  sl[MAX_LINE_LENGTH];             ///< Current source line buffer
 extern int   prgType;                         ///< Program type (e.g., module, program, etc.)
 extern char  token[MAX_WORD_LENGTH];          ///< Current token string
 extern char  tokenSave[MAX_WORD_LENGTH];      ///< Backup of last token
+extern char  dataSegmentBase[3];
+extern char        baseRegData[5];
 extern int   tokTyp;                          ///< Current token type
 extern int   tokTypSave;                      ///< Backup of token type
 extern int   numToken;                        ///< Number of tokens parsed
@@ -128,6 +130,7 @@ extern SymNode* currentSym;            ///< Current symbol
 extern SymNode* currentSymSave;        ///< Saved current symbol
 extern char            symFunc[50];           ///< Function name of symbol
 extern char            symValue[50];          ///< Value of symbol
+extern char            symDataSegmentBase[5];
 extern int             symcodeAdr;            ///< Code address of symbol
 
 // ============================================================================
@@ -194,6 +197,7 @@ struct SymNode {
     SYM_ScopeType type;         ///< Scope type
     int scopeLevel;             ///< Scope nesting level
     char scopeName[50];         ///< Scope name
+    char dataSegReg[3]; ///< base register for segment
     char label[50];             ///< Symbol label
     char func[50];              ///< Function name
     char value[50];             ///< Symbol value
@@ -217,6 +221,7 @@ struct ASTNode {
     SymNode* symNodeAdr;        ///< Linked symbol table node
     int codeAdr;                ///< Code address
     int operandType;            ///< Operand type (1=REGISTER, 2=MEMORY, 3=LABEL)
+    char* basereg;              ///< base register for variable
     uint32_t _binInstr;         ///< Encoded instruction word
     struct ASTNode** children;  ///< Child nodes
     int childCount;             ///< Number of children

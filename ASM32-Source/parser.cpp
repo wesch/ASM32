@@ -40,6 +40,7 @@ ASTNode* createASTnode(AST_NodeType type, const char* value, int valnum) {
     node->symNodeAdr = scopeTab[currentScopeLevel];
     node->children = NULL;
     node->codeAdr = codeAdr;
+    node->basereg = strdup(baseRegData);
     node->operandType = operandType;
     node->childCount = 0;
     return node;
@@ -95,6 +96,7 @@ SymNode* createSYMnode(SYM_ScopeType type, char* label, char* func, const char* 
     strcpy(node->label, label);
     strcpy(node->func, func);
     strcpy(node->value, value);
+    strcpy(node->dataSegReg, dataSegmentBase);
     node->varType = varType;
     node->lineNr = lineNr;
     node->codeAdr = codeAdr;
@@ -165,6 +167,7 @@ void searchSymAll(SymNode* node, char* label, int depth) {
         strcmp(node->scopeName, currentScopeName) == 0) {
         strcpy(symFunc, node->func);
         strcpy(symValue, node->value);
+        strcpy(symDataSegmentBase, node->dataSegReg);
         dataAdr = node->dataAdr;
         symcodeAdr = node->codeAdr;
         symFound = TRUE;
@@ -221,12 +224,12 @@ void printSYM(SymNode* node, int depth) {
     for (int i = 0; i < depth; i++) {
         printf(" ");
     }
-    printf("%s:\t%d\t%04x\t%04x\t%-8s %-6s\t%.5s\t%d\t%d\t%s\n",
+    printf("%s:\t%d\t%04x\t%04x\t%-8s %-3s %-6s\t%.5s\t%d\t%d\t%s\n",
         (node->type == SCOPE_PROGRAM) ? "P" :
         (node->type == SCOPE_MODULE) ? "M" :
         (node->type == SCOPE_FUNCTION) ? "F" :
         (node->type == SCOPE_DIRECT) ? "D" :
-        "Unknown", node->scopeLevel, node->codeAdr, node->dataAdr, node->label, node->func, node->value, node->varType, node->lineNr, node->scopeName);
+        "Unknown", node->scopeLevel, node->codeAdr, node->dataAdr, node->label, node->dataSegReg, node->func, node->value, node->varType, node->lineNr, node->scopeName);
     if (node->type == SCOPE_PROGRAM) {
         printf("-->Source File: %s\n", node->value);
     }
@@ -456,11 +459,13 @@ int64_t parseFactor() {
                     varType = V_VALUE;
                 }
                 else if (strcmp(symFunc, "WORD") == 0 ||
+                    strcmp(symFunc, "DOUBLE") == 0 ||
                     strcmp(symFunc, "HALF") == 0 ||
                     strcmp(symFunc, "BYTE") == 0) {
                     // Variables: global (DP) or local (SP) based on scope
                     strcpy(varName, token);
                     varType = (currentScopeType == SCOPE_MODULE) ? V_MEMGLOBAL : V_MEMLOCAL;
+                    strcpy(token, symValue);
                 }
                 else {
                     snprintf(errmsg, sizeof(errmsg), "Invalid symbol name %s ", token);
@@ -481,6 +486,7 @@ int64_t parseFactor() {
             else if (varType == V_MEMGLOBAL) {
                 // TODO: Confirm HALF and BYTE alignment in memory
                 n = dataAdr;
+
             }
             else if (varType == V_MEMLOCAL) {
                 // Placeholder for local memory handling
@@ -591,7 +597,7 @@ void printAST(ASTNode* node, int depth) {
 
     value = (node->type == NODE_INSTRUCTION) ? 0 : node->valnum;
 
-    printf("%s:\t%4d\t%04x %1d   %.6s\t%4d\t%d\t%s\n",
+    printf("%s:\t%4d\t%04x %1d   %.6s\t%4d\t%s\t%d\t%s\n",
         (node->type == NODE_PROGRAM) ? "Prg" :
         (node->type == NODE_INSTRUCTION) ? "Ins" :
         (node->type == NODE_DIRECTIVE) ? "Dir" :
@@ -606,7 +612,7 @@ void printAST(ASTNode* node, int depth) {
         (node->type == NODE_ENTRY) ? "Ent" :
         "Unknown",
         node->lineNr, node->codeAdr, node->operandType,
-        node->value, (int)value, node->scopeLevel, node->scopeName);
+        node->value, (int)value, node->basereg, node->scopeLevel, node->scopeName);
 
     for (int i = 0; i < node->childCount; i++) {
         printAST(node->children[i], depth + 1);
@@ -2228,7 +2234,13 @@ void parseLDR_STC() {
         }
         operandType = OT_MEMGLOB;
         mode = 3;
-        ASTop2 = createASTnode(NODE_OPERAND, varName, value);
+        // Basis Register aus Symtab holen
+        strcpy(baseRegData, symDataSegmentBase);
+
+        if (searchSymbol(scopeTab[searchScopeLevel], varName)) {
+//            printf("-------> %s\n\n", baseRegData);
+        }
+        ASTop2 = createASTnode(NODE_OPERAND, varName, dataAdr);
         addASTchild(ASTinstruction, ASTop2);
         return;
     }
@@ -2369,11 +2381,8 @@ void parseLDO() {
         }
         operandType = OT_MEMGLOB;
         mode = 3;
-        ASTop2 = createASTnode(NODE_OPERAND, varName, value);
+        ASTop2 = createASTnode(NODE_OPERAND, varName, dataAdr);
         addASTchild(ASTinstruction, ASTop2);
-        operandType = OT_NOTHING;
-        ASTmode = createASTnode(NODE_MODE, "", mode);
-        addASTchild(ASTinstruction, ASTmode);
         return;
     }
     fetchToken();
@@ -2863,7 +2872,13 @@ void parseLD_ST() {
             }
             operandType = OT_MEMGLOB;
             mode = 3;
-            ASTop2 = createASTnode(NODE_OPERAND, varName, value);
+            // Basis Register aus Symtab holen
+            strcpy(baseRegData, symDataSegmentBase);
+
+            if (searchSymbol(scopeTab[searchScopeLevel], varName)) {
+//               printf("-------> %s\n\n", baseRegData);
+            }
+            ASTop2 = createASTnode(NODE_OPERAND, varName, dataAdr);
             addASTchild(ASTinstruction, ASTop2);
             return;
         }
@@ -3041,7 +3056,13 @@ void parseLDA_STA() {
             }
             operandType = OT_MEMGLOB;
             mode = 3;
-            ASTop2 = createASTnode(NODE_OPERAND, varName, value);
+            // Basis Register aus Symtab holen
+            strcpy(baseRegData, symDataSegmentBase);
+
+            if (searchSymbol(scopeTab[searchScopeLevel], varName)) {
+//                printf("-------> %s\n\n", baseRegData);
+            }
+            ASTop2 = createASTnode(NODE_OPERAND, varName, dataAdr);
             addASTchild(ASTinstruction, ASTop2);
             return;
         }
@@ -3810,11 +3831,18 @@ void parseModInstr() {
             if (DBG_PARSER) printf("Variable %s global/local %d\n", varName, varType);
             operandType = OT_MEMGLOB;
             mode = 3;
-            ASTop2 = createASTnode(NODE_OPERAND, varName, value);
+            // Basis Register aus Symtab holen
+            strcpy(baseRegData, symDataSegmentBase);
+           
+            if (searchSymbol(scopeTab[searchScopeLevel], varName)) {
+//                printf("-------> %s\n\n", baseRegData);
+            }
+            ASTop2 = createASTnode(NODE_OPERAND, varName, dataAdr);
             addASTchild(ASTinstruction, ASTop2);
-
+            baseRegData[0] = '\0';
             ASTmode = createASTnode(NODE_MODE, "", mode);
             addASTchild(ASTinstruction, ASTmode);
+
             return;
         }
 
@@ -4135,6 +4163,9 @@ void ParseDirective() {
 
             codeExist = TRUE;
 
+
+            // codeAdr = 0;
+
             /// Defines code section attributes: ADDR, ALIGN, ENTRY.
             if (prgType == P_STANDALONE) {
 
@@ -4173,6 +4204,8 @@ void ParseDirective() {
                         strToUpper(token);
                         ASTaddr = createASTnode(NODE_ADDR, "", elfCodeAddr);
                         addASTchild(ASTcode, ASTaddr);
+                        codeAdr = elfCodeAddr;
+
                     }
                     else if (strcmp(token, "ALIGN") == 0) {
                         fetchToken();
@@ -4234,6 +4267,8 @@ void ParseDirective() {
 
         case D_DATA:
 
+            dataAdr = 0;
+
             if (dataExist == TRUE) {
                 // add datasegment address to segment table
                 addSegmentEntry(numSegment, labelDataOld, 'D', elfDataAddrOld, numOfData);
@@ -4249,12 +4284,30 @@ void ParseDirective() {
 
                 fetchToken();
                 strToUpper(token);
+                dataSegmentBase[0] = '\0';
+
                 do {
                     if (strcmp(token, "ADDR") == 0) {
                         fetchToken();
                         elfDataAddr = parseExpression();
                         strToUpper(token);
 
+                    }
+                    else if (strcmp(token, "BASE") == 0) {
+                        fetchToken();
+                        strToUpper(token);
+                        if (checkGenReg() == FALSE) {
+                            snprintf(errmsg, sizeof(errmsg), "Invalid Base Register %s",token);
+                            processError(errmsg);
+                            skipToEOL();
+                            return;
+                        }
+                        else
+                        {
+                            strcpy(dataSegmentBase, token);
+                        }
+                        fetchToken();
+                        strToUpper(token);
                     }
                     else if (strcmp(token, "ALIGN") == 0) {
                         fetchToken();
@@ -4272,7 +4325,6 @@ void ParseDirective() {
                             skipToEOL();
                             return;
                         }
-
                     }
                     else {
                         snprintf(errmsg, sizeof(errmsg), "Invalid Parameter %s", token);
@@ -4285,6 +4337,12 @@ void ParseDirective() {
                         strToUpper(token);
                     }
                 } while (tokTyp != T_EOL);
+                if (dataSegmentBase[0] == '\0') {
+                    snprintf(errmsg, sizeof(errmsg), "Base register for data section required");
+                    processError(errmsg);
+                    skipToEOL();
+                    return;
+                }
 
                 // create ELF structures for DATA
                 createDataSegment();
@@ -4461,7 +4519,7 @@ void ParseDirective() {
             // expression calculation 
             value = parseExpression();
             strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
-
+            sprintf(token, "%d", value);
 
             // Write in SYMTAB
             addDirectiveToScope(SCOPE_DIRECT, label, dirCode, token, lineNr);
@@ -4677,9 +4735,10 @@ void ParseDirective() {
             if ((dataAdr % 4) != 0) {
                 dataAdr = ((dataAdr / 4) * 4) + 4;
             }
-            strcpy(elfData, "\0\0\0\0\0\0\0\0");
-            addDataSectionData(elfData, dataAdr - dataAdrOld);
-
+            if ((dataAdr - dataAdrOld) != 0) {
+                strcpy(elfData, "\0\0\0\0\0\0\0\0");
+                addDataSectionData(elfData, dataAdr - dataAdrOld);
+            }
             // Write in SYMTAB
             addDirectiveToScope(SCOPE_DIRECT, label, dirCode, token, lineNr);
 

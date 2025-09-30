@@ -27,6 +27,8 @@ char        sl[MAX_LINE_LENGTH];            ///< Raw input buffer holding the cu
 int         prgType;                        ///< Program type: 0 = undefined, 1 = standalone, 2 = module.
 char        token[MAX_WORD_LENGTH];         ///< Current token text.
 char        tokenSave[MAX_WORD_LENGTH];     ///< Previously seen token text (look-behind).
+char        dataSegmentBase[3];             ///< Restitername of actual data segment;
+char        baseRegData[5]; 
 int         tokTyp;                         ///< Current token type (see TokenType).
 int         tokTypSave;                     ///< Previous token type (look-behind).
 int         numToken;                       ///< Integer value parsed from a numeric token.
@@ -110,6 +112,7 @@ bool DBG_SYMTAB = TRUE;  ///< Dump symbol table after codegen.
 bool DBG_AST = FALSE;     ///< Dump abstract syntax tree after parsing.
 bool DBG_SEGMENT = TRUE; ///< Dump segment table
 bool DBG_SOURCE = TRUE;  ///< Print source listing with addresses and binary.
+bool DBG_ELF = TRUE;     ///< Dump ELF file
 
 // --------------------------------------------------------------------------------
 /** \name Token list
@@ -148,6 +151,7 @@ SymNode* currentSymSave = NULL;             ///< Saved symbol node (temporary).
 
 char        symFunc[50];                    ///< Symbol "function"/kind stored in the symbol table (e.g., PROGRAM, REG).
 char        symValue[50];                   ///< Symbol value stored in the symbol table (textual form).
+char        symDataSegmentBase[5];
 
 // --------------------------------------------------------------------------------
 /** \name Abstract Syntax Tree (AST)
@@ -321,6 +325,7 @@ SRCNode* createSRCnode(SRC_NodeType type, const char* text, int lineNr) {
     node->text = strdup(text);
     node->children = NULL;
     node->childCount = 0;
+    node->codeAdr = codeAdr;
     return node;
 }
 
@@ -388,25 +393,25 @@ void printSourceListing(SRCNode* node, int depth) {
 
     if (node->linenr != 0) {
         if (node->type == SRC_ERROR) {
-            printf("                    E: \t%s", node->text);
+            printf("                        E: \t%s", node->text);
         }
         else if (node->type == SRC_WARNING) {
-            printf("                    W: \t%s", node->text);
+            printf("                        W: \t%s", node->text);
         }
         else if (node->type == SRC_SOURCE &&
             node->binStatus == B_BIN) {
-            printf(" %04x %08x %4d %s", node->codeAdr, node->binInstr, node->linenr, node->text);
+            printf(" %08x %08x %4d %s", node->codeAdr, node->binInstr, node->linenr, node->text);
         }
         else if (node->type == SRC_BIN &&
             node->binStatus == B_BINCHILD) {
-            printf(" %04x %08x %4d %s", node->codeAdr, node->binInstr, node->linenr, node->text);
+            printf(" %08x %08x %4d %s", node->codeAdr, node->binInstr, node->linenr, node->text);
         }
         else if (node->type == SRC_SOURCE &&
             node->binStatus == B_NOBIN) {
-            printf("               %4d %s", node->linenr, node->text);
+            printf("                   %4d %s", node->linenr, node->text);
         }
         else if (node->type == SRC_INFO) {
-            printf("                    I:  %s", node->text);
+            printf("                        I:  %s", node->text);
         }
     }
     else {
@@ -653,7 +658,7 @@ int main(int argc, char** argv) {
         printf("\n\n+------------------------------------------------------------------------------------+\n");
         printf("|                           SYMBOL TABLE                                             |\n");
         printf("+------------------------------------------------------------------------------------+ \n");
-        printf("Node\tScope\tCAdr\tDAdr\tlabel   Func\tvalue\tVarType\tlinenr\tScopeName\n");
+        printf("Node\tScope\tCAdr\tDAdr\tlabel   Base Func\tvalue\tVarType\tlinenr\tScopeName\n");
         printf("+------------------------------------------------------------------------------------+ \n");
 
         printSYM(GlobalSYM, 0);
@@ -713,27 +718,28 @@ int main(int argc, char** argv) {
     addNote();
     writeElfFile();
 
-    printf("\n\n+------------------------------------------------------------------------------------+\n");
-    printf("|                           ELF FILE                                         |\n");
-    printf("+------------------------------------------------------------------------------------+ \n");
+    if (DBG_ELF == TRUE) {
+        printf("\n\n+------------------------------------------------------------------------------------+\n");
+        printf("|                           ELF FILE                                           |\n");
+        printf("+------------------------------------------------------------------------------------+ \n");
 
-    elfio reader;
+        elfio reader;
 
-    if (!reader.load("ASM32.out")) {
-        printf("File %s is not found or it is not an ELF file\n", argv[1]);
-        return 1;
+        if (!reader.load("ASM32.out")) {
+            printf("File %s is not found or it is not an ELF file\n", argv[1]);
+            return 1;
+        }
+
+        dump::header(std::cout, reader);
+        dump::section_headers(std::cout, reader);
+        dump::segment_headers(std::cout, reader);
+        dump::symbol_tables(std::cout, reader);
+        dump::notes(std::cout, reader);
+        dump::modinfo(std::cout, reader);
+        dump::dynamic_tags(std::cout, reader);
+        dump::section_datas(std::cout, reader);
+        dump::segment_datas(std::cout, reader);
     }
-
-    dump::header(std::cout, reader);
-    dump::section_headers(std::cout, reader);
-    dump::segment_headers(std::cout, reader);
-    dump::symbol_tables(std::cout, reader);
-    dump::notes(std::cout, reader);
-    dump::modinfo(std::cout, reader);
-    dump::dynamic_tags(std::cout, reader);
-    dump::section_datas(std::cout, reader);
-    dump::segment_datas(std::cout, reader);
-
 
     exit(0);
 
