@@ -30,19 +30,20 @@ ASTNode* createASTnode(AST_NodeType type, const char* value, int valnum) {
         fatalError("malloc failed");
     }
     strcpy(currentScopeName, scopeNameTab[currentScopeLevel]);
-    node->type = type;
-    node->value = strdup(value);
-    node->valnum = valnum;
-    node->lineNr = lineNr;
-    node->column = column;
-    node->scopeLevel = currentScopeLevel;
-    node->scopeName = strdup(currentScopeName);
+    node->a_type = type;
+    node->a_value = strdup(value);
+    node->a_valnum = valnum;
+    node->a_lineNr = lineNr;
+    node->a_column = column;
+    node->a_numInstr = 1; 
+    node->a_scopeLevel = currentScopeLevel;
+    node->a_scopeName = strdup(currentScopeName);
     node->symNodeAdr = scopeTab[currentScopeLevel];
     node->children = NULL;
-    node->codeAdr = codeAdr;
-    node->basereg = strdup(baseRegData);
-    node->operandType = operandType;
-    node->childCount = 0;
+    node->a_codeAdr = codeAdr;
+    node->a_baseReg = strdup(baseRegData);
+    node->a_operandType = operandType;
+    node->a_childCount = 0;
     return node;
 }
 
@@ -53,19 +54,19 @@ ASTNode* createASTnode(AST_NodeType type, const char* value, int valnum) {
 /// Expands the parent's child list dynamically.
 /// Fatal error if memory reallocation fails.
 void addASTchild(ASTNode* parent, ASTNode* child) {
-    parent->children = (ASTNode**)realloc(parent->children, sizeof(ASTNode*) * (parent->childCount + 1));
+    parent->children = (ASTNode**)realloc(parent->children, sizeof(ASTNode*) * (parent->a_childCount + 1));
     if (parent->children == NULL) {
         fatalError("realloc failed");
     }
-    parent->children[parent->childCount++] = child;
+    parent->children[parent->a_childCount++] = child;
 }
 
 /// \brief Recursively free an AST node and all its children.
 /// \param node Root of the AST subtree to free.
 void freeASTnode(ASTNode* node) {
     if (node) {
-        free(node->value);
-        for (int i = 0; i < node->childCount; i++) {
+        free(node->a_value);
+        for (int i = 0; i < node->a_childCount; i++) {
             freeASTnode(node->children[i]);
         }
         free(node->children);
@@ -90,19 +91,20 @@ SymNode* createSYMnode(SYM_ScopeType type, char* label, char* func, const char* 
     if (node == NULL) {
         fatalError("malloc failed");
     }
-    node->type = type;
-    node->scopeLevel = currentScopeLevel;
-    strcpy(node->scopeName, currentScopeName);
-    strcpy(node->label, label);
-    strcpy(node->func, func);
-    strcpy(node->value, value);
-    strcpy(node->dataSegReg, dataSegmentBase);
-    node->varType = varType;
-    node->lineNr = lineNr;
-    node->codeAdr = codeAdr;
-    node->dataAdr = dataAdr;
+    node->y_type = type;
+    node->y_scopeLevel = currentScopeLevel;
+    strcpy(node->y_scopeName, currentScopeName);
+    strcpy(node->y_label, label);
+    strcpy(node->y_func, func);
+    strcpy(node->y_value, value);
+    strcpy(node->y_baseReg, dataSegmentBase);
+    strcpy(node->y_currCodeSection, currentCODE);
+    node->y_varType = varType;
+    node->y_lineNr = lineNr;
+    node->y_codeAdr = codeAdr;
+    node->y_dataAdr = dataAdr;
     node->children = NULL;
-    node->childCount = 0;
+    node->y_childCount = 0;
     return node;
 }
 
@@ -113,11 +115,11 @@ SymNode* createSYMnode(SYM_ScopeType type, char* label, char* func, const char* 
 /// Expands the parent's child list dynamically.
 /// Fatal error if memory reallocation fails.
 void addSYMchild(SymNode* parent, SymNode* child) {
-    parent->children = (SymNode**)realloc(parent->children, sizeof(SymNode*) * (parent->childCount + 1));
+    parent->children = (SymNode**)realloc(parent->children, sizeof(SymNode*) * (parent->y_childCount + 1));
     if (parent->children == NULL) {
         fatalError("realloc failed");
     }
-    parent->children[parent->childCount++] = child;
+    parent->children[parent->y_childCount++] = child;
 }
 
 /// \brief Add a new scope to the symbol table.
@@ -162,18 +164,18 @@ void addDirectiveToScope(SYM_ScopeType type, char* label, char* func, const char
 /// Updates global variables if a match is found.
 void searchSymAll(SymNode* node, char* label, int depth) {
     if (!node) return;
-    if (strcmp(node->label, label) == 0 &&
-        node->scopeLevel <= searchScopeLevel &&
-        strcmp(node->scopeName, currentScopeName) == 0) {
-        strcpy(symFunc, node->func);
-        strcpy(symValue, node->value);
-        strcpy(symDataSegmentBase, node->dataSegReg);
-        dataAdr = node->dataAdr;
-        symcodeAdr = node->codeAdr;
+    if (strcmp(node->y_label, label) == 0 &&
+        node->y_scopeLevel <= searchScopeLevel &&
+        strcmp(node->y_scopeName, currentScopeName) == 0) {
+        strcpy(symFunc, node->y_func);
+        strcpy(symValue, node->y_value);
+        strcpy(symDataSegmentBase, node->y_baseReg);
+        dataAdr = node->y_dataAdr;
+        symcodeAdr = node->y_codeAdr;
         symFound = TRUE;
         return;
     }
-    for (int i = 0; i < node->childCount; i++) {
+    for (int i = 0; i < node->y_childCount; i++) {
         searchSymAll(node->children[i], label, depth + 1);
     }
 }
@@ -184,14 +186,14 @@ void searchSymAll(SymNode* node, char* label, int depth) {
 /// \param depth Recursive depth (for traversal).
 void searchSymLevel(SymNode* node, char* label, int depth) {
     if (!node) return;
-    if (strcmp(node->label, label) == 0 &&
-        node->scopeLevel == searchScopeLevel &&
-        strcmp(node->scopeName, currentScopeName) == 0) {
-        symcodeAdr = node->codeAdr;
+    if (strcmp(node->y_label, label) == 0 &&
+        node->y_scopeLevel == searchScopeLevel &&
+        strcmp(node->y_scopeName, currentScopeName) == 0) {
+        symcodeAdr = node->y_codeAdr;
         symFound = TRUE;
         return;
     }
-    for (int i = 0; i < node->childCount; i++) {
+    for (int i = 0; i < node->y_childCount; i++) {
         searchSymLevel(node->children[i], label, depth + 1);
     }
 }
@@ -216,27 +218,76 @@ bool searchSymbol(SymNode* node, char* label) {
     return symFound;
 }
 
+/// \brief Update symbol table adresses of CODE section
+/// \param node Current symbol node.
+
+void updSYM(SymNode* node, int depth) {
+    if (!node) return;
+    if (strcmp(node->y_currCodeSection, currentCODE) == 0) {
+//        if (node->codeAdr >= codeAdr) {
+            node->y_codeAdr = (node->y_codeAdr) + 4;
+//        }
+    }
+    for (int i = 0; i < node->y_childCount; i++) {
+        updSYM(node->children[i], depth + 1);
+    }
+}
+
+
+
 /// \brief Print the symbol table hierarchy.
 /// \param node Current symbol node.
 /// \param depth Indentation level for pretty-printing.
+/// 
 void printSYM(SymNode* node, int depth) {
     if (!node) return;
-    for (int i = 0; i < depth; i++) {
-        printf(" ");
+    //    for (int i = 0; i < depth; i++) {
+    //        printf(" ");
+    //    }
+
+ 
+
+    char buffer[9];
+
+
+    if (node->y_type == SCOPE_PROGRAM) {
+        printf("%-5s %4d                %-8s        %-12s\n", "P", node->y_lineNr,  node->y_label,node->y_value);
     }
-    printf("%s:\t%d\t%04x\t%04x\t%-8s %-3s %-6s\t%.5s\t%d\t%d\t%s\n",
-        (node->type == SCOPE_PROGRAM) ? "P" :
-        (node->type == SCOPE_MODULE) ? "M" :
-        (node->type == SCOPE_FUNCTION) ? "F" :
-        (node->type == SCOPE_DIRECT) ? "D" :
-        "Unknown", node->scopeLevel, node->codeAdr, node->dataAdr, node->label, node->dataSegReg, node->func, node->value, node->varType, node->lineNr, node->scopeName);
-    if (node->type == SCOPE_PROGRAM) {
-        printf("-->Source File: %s\n", node->value);
+    if (node->y_type == SCOPE_DIRECT) {
+        if ((strcmp(node->y_func, "REG") == 0) || (strcmp(node->y_func, "EQU") == 0)) {
+
+            printf("%-5s %4d                %-8s %-6s %-12s\n", "D", node->y_lineNr, node->y_label, node->y_func, node->y_value);
+        }
+        snprintf(buffer, sizeof(buffer), "%08X", node->y_dataAdr);
+        if ((strcmp(node->y_func, "BYTE") == 0) ||
+            (strcmp(node->y_func, "HALF") == 0) ||
+            (strcmp(node->y_func, "WORD") == 0) ||
+            (strcmp(node->y_func, "DOUBLE") == 0) ||
+            (strcmp(node->y_func, "BUFFER") == 0)) {
+            printf("%-5s %4d %.4s %.4s  %-3s %-8s %-6s %-16s\n", "D", node->y_lineNr, buffer, buffer + 4, node->y_baseReg, node->y_label, node->y_func, node->y_value);
+        }
+        if ((strcmp(node->y_func, "STRING") == 0)) {
+            printf("%-5s %4d %.4s %.4s  %-3s %-8s %-6s %-16s\n", "D", node->y_lineNr, buffer, buffer + 4, node->y_baseReg, node->y_label, node->y_func, node->y_value);
+        }
+
+
+        if ((strcmp(node->y_func, "CODE") == 0)) {
+            printf("%-5s %4d                %-8s %-6s\n", "D", node->y_lineNr, node->y_label, node->y_func);
+        }
+        if ((strcmp(node->y_func, "DATA") == 0)) {
+            printf("%-5s %4d            %-3s %-8s %-6s\n", "D", node->y_lineNr, node->y_baseReg,node->y_label, node->y_func);
+        }
+        if ((strcmp(node->y_func, "LABEL") == 0)) {
+            snprintf(buffer, sizeof(buffer), "%08X", node->y_codeAdr);
+            printf("%-5s %4d %.4s %.4s      %-8s %-6s %-12s\n", "D", node->y_lineNr, buffer, buffer + 4, node->y_label, node->y_func, node->y_value);
+        }
     }
-    for (int i = 0; i < node->childCount; i++) {
+    
+    for (int i = 0; i < node->y_childCount; i++) {
         printSYM(node->children[i], depth + 1);
     }
 }
+
 
 
 // =================================================================================
@@ -574,10 +625,10 @@ int64_t parseExpression() {
 ///
 void fetchToken() {
     ptr_t = ptr_t->next;
-    strcpy(token, ptr_t->token);
-    tokTyp = ptr_t->tokTyp;
-    lineNr = ptr_t->lineNumber;
-    column = ptr_t->column;
+    strcpy(token, ptr_t->t_token);
+    tokTyp = ptr_t->t_tokTyp;
+    lineNr = ptr_t->t_lineNr;
+    column = ptr_t->t_column;
 }
 
 /// @brief Print the Abstract Syntax Tree (AST).
@@ -595,26 +646,26 @@ void printAST(ASTNode* node, int depth) {
         printf(" ");
     }
 
-    value = (node->type == NODE_INSTRUCTION) ? 0 : node->valnum;
+    value = (node->a_type == NODE_INSTRUCTION) ? 0 : node->a_valnum;
 
     printf("%s:\t%4d\t%04x %1d   %.6s\t%4d\t%s\t%d\t%s\n",
-        (node->type == NODE_PROGRAM) ? "Prg" :
-        (node->type == NODE_INSTRUCTION) ? "Ins" :
-        (node->type == NODE_DIRECTIVE) ? "Dir" :
-        (node->type == NODE_CODE) ? "Cod" :
-        (node->type == NODE_OPERATION) ? "OpC" :
-        (node->type == NODE_OPERAND) ? "Op " :
-        (node->type == NODE_OPTION) ? "Opt" :
-        (node->type == NODE_MODE) ? "Mod" :
-        (node->type == NODE_LABEL) ? "Lab" :
-        (node->type == NODE_ADDR) ? "Adr" :
-        (node->type == NODE_ALIGN) ? "Alg" :
-        (node->type == NODE_ENTRY) ? "Ent" :
+        (node->a_type == NODE_PROGRAM) ? "Prg" :
+        (node->a_type == NODE_INSTRUCTION) ? "Ins" :
+        (node->a_type == NODE_DIRECTIVE) ? "Dir" :
+        (node->a_type == NODE_CODE) ? "Cod" :
+        (node->a_type == NODE_OPERATION) ? "OpC" :
+        (node->a_type == NODE_OPERAND) ? "Op " :
+        (node->a_type == NODE_OPTION) ? "Opt" :
+        (node->a_type == NODE_MODE) ? "Mod" :
+        (node->a_type == NODE_LABEL) ? "Lab" :
+        (node->a_type == NODE_ADDR) ? "Adr" :
+        (node->a_type == NODE_ALIGN) ? "Alg" :
+        (node->a_type == NODE_ENTRY) ? "Ent" :
         "Unknown",
-        node->lineNr, node->codeAdr, node->operandType,
-        node->value, (int)value, node->basereg, node->scopeLevel, node->scopeName);
+        node->a_lineNr, node->a_codeAdr, node->a_operandType,
+        node->a_value, (int)value, node->a_baseReg, node->a_scopeLevel, node->a_scopeName);
 
-    for (int i = 0; i < node->childCount; i++) {
+    for (int i = 0; i < node->a_childCount; i++) {
         printAST(node->children[i], depth + 1);
     }
 }
@@ -3927,7 +3978,7 @@ void parseInstruction() {
     int i = 0;
     lineERR = FALSE;
     varType = V_VALUE;
-
+    is_negative = FALSE;
     if (codeExist == FALSE) {
         snprintf(errmsg, sizeof(errmsg), ".CODE directive missing");
         processError(errmsg);
@@ -4163,9 +4214,6 @@ void ParseDirective() {
 
             codeExist = TRUE;
 
-
-            // codeAdr = 0;
-
             /// Defines code section attributes: ADDR, ALIGN, ENTRY.
             if (prgType == P_STANDALONE) {
 
@@ -4173,16 +4221,20 @@ void ParseDirective() {
                 ASTcode = createASTnode(NODE_CODE, "CODE", 0);
                 addASTchild(ASTprogram, ASTcode);
                 if (strcmp(label, "") != 0) {
+
                     symFound = FALSE;
                     searchScopeLevel = currentScopeLevel;
                     searchSymLevel(scopeTab[searchScopeLevel], label, 0);
 
                     if (!symFound) {
-                        strcpy(dirCode, "LABEL");
+
+                        strcpy(dirCode, "CODE");
                         directive = createSYMnode(SCOPE_DIRECT, label, dirCode, "", lineNr);
                         addSYMchild(scopeTab[currentScopeLevel], directive);
+                        strcpy(currentCODE, label);
                     }
                     else {
+
                         snprintf(errmsg, sizeof(errmsg), "Label %s already defined ", label);
                         processError(errmsg);
                         strcpy(label, "");
@@ -4199,6 +4251,7 @@ void ParseDirective() {
                 strToUpper(token);
                 do {
                     if (strcmp(token, "ADDR") == 0) {
+
                         fetchToken();
                         elfCodeAddr = parseExpression();
                         strToUpper(token);
@@ -4208,6 +4261,7 @@ void ParseDirective() {
 
                     }
                     else if (strcmp(token, "ALIGN") == 0) {
+
                         fetchToken();
                         elfCodeAlign = parseExpression();
                         strToUpper(token);
@@ -4219,6 +4273,7 @@ void ParseDirective() {
                         }
                         elfDataAlign = elfCodeAlign; // Default data alignment matches code
                         if ((elfCodeAddr % elfCodeAlign) != 0) {
+
                             snprintf(errmsg, sizeof(errmsg), "Address %x not aligned by %x", elfCodeAddr, elfCodeAlign);
                             processError(errmsg);
                             skipToEOL();
@@ -4228,10 +4283,12 @@ void ParseDirective() {
                         addASTchild(ASTcode, ASTalign);
                     }
                     else if (strcmp(token, "ENTRY") == 0) {
+
                         if (elfEntryPointStatus == FALSE) {
                             elfEntryPointStatus = TRUE;
                         }
                         else {
+
                             snprintf(errmsg, sizeof(errmsg), "Entry point already set");
                             processError(errmsg);
                             skipToEOL();
@@ -4242,12 +4299,14 @@ void ParseDirective() {
                         fetchToken();
                     }
                     else {
+
                         snprintf(errmsg, sizeof(errmsg), "Invalid Parameter %s", token);
                         processError(errmsg);
                         skipToEOL();
                         return;
                     }
                     if (tokTyp == T_COMMA) {
+
                         fetchToken();
                         strToUpper(token);
                     }
@@ -4275,8 +4334,6 @@ void ParseDirective() {
                 numSegment++;
                 numOfData = 0;
             }
-
-
             dataExist = TRUE;
 
             /// Defines data section attributes: ADDR, ALIGN.
@@ -4294,9 +4351,11 @@ void ParseDirective() {
 
                     }
                     else if (strcmp(token, "BASE") == 0) {
+
                         fetchToken();
                         strToUpper(token);
                         if (checkGenReg() == FALSE) {
+
                             snprintf(errmsg, sizeof(errmsg), "Invalid Base Register %s",token);
                             processError(errmsg);
                             skipToEOL();
@@ -4310,16 +4369,19 @@ void ParseDirective() {
                         strToUpper(token);
                     }
                     else if (strcmp(token, "ALIGN") == 0) {
+
                         fetchToken();
                         elfDataAlign = parseExpression();
                         strToUpper(token);
                         if (elfDataAlign == 0) {
+
                             snprintf(errmsg, sizeof(errmsg), "Alignment of 0 not allowed");
                             processError(errmsg);
                             skipToEOL();
                             return;
                         }
                         if ((elfDataAddr % elfDataAlign) != 0) {
+
                             snprintf(errmsg, sizeof(errmsg), "Address %x not aligned by %x", elfDataAddr, elfDataAlign);
                             processError(errmsg);
                             skipToEOL();
@@ -4327,21 +4389,43 @@ void ParseDirective() {
                         }
                     }
                     else {
+
                         snprintf(errmsg, sizeof(errmsg), "Invalid Parameter %s", token);
                         processError(errmsg);
                         skipToEOL();
                         return;
                     }
                     if (tokTyp == T_COMMA) {
+
                         fetchToken();
                         strToUpper(token);
                     }
                 } while (tokTyp != T_EOL);
                 if (dataSegmentBase[0] == '\0') {
+
                     snprintf(errmsg, sizeof(errmsg), "Base register for data section required");
                     processError(errmsg);
                     skipToEOL();
                     return;
+                }
+
+                if (strcmp(label, "") != 0) {
+                    symFound = FALSE;
+                    searchScopeLevel = currentScopeLevel;
+                    searchSymLevel(scopeTab[searchScopeLevel], label, 0);
+
+                    if (!symFound) {
+                        strcpy(dirCode, "DATA");
+                        directive = createSYMnode(SCOPE_DIRECT, label, dirCode, "", lineNr);
+                        addSYMchild(scopeTab[currentScopeLevel], directive);
+                        }
+                    else {
+                        snprintf(errmsg, sizeof(errmsg), "Label %s already defined ", label);
+                        processError(errmsg);
+                        strcpy(label, "");
+                        skipToEOL();
+                        return;
+                    }
                 }
 
                 // create ELF structures for DATA
@@ -4463,7 +4547,13 @@ void ParseDirective() {
             }
 
             // Write symbol table entry
-            addDirectiveToScope(SCOPE_DIRECT, label, dirCode, token, lineNr);
+            if (strcmp(token, "EOL") == 0) {
+                strcpy(buffer, "");
+            }
+            else {
+                strcpy(buffer, token);
+            }
+            addDirectiveToScope(SCOPE_DIRECT, label, dirCode, buffer, lineNr);
 
             // Allocate memory for buffer
             elfBuffer = (char*)malloc(buf_size);
@@ -4577,7 +4667,7 @@ void ParseDirective() {
                 strcpy(elfData, "\0\0\0\0\0\0\0\0");
                 addDataSectionData(elfData, dataAdr - dataAdrOld);
             }
-
+            sprintf(token, "%d", value);
             // Write in SYMTAB
             addDirectiveToScope(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
@@ -4634,7 +4724,7 @@ void ParseDirective() {
                 strcpy(elfData, "\0\0\0\0\0\0\0\0");
                 addDataSectionData(elfData, dataAdr - dataAdrOld);
             }
-
+            sprintf(token, "%d", value);
             // Write in SYMTAB
             addDirectiveToScope(SCOPE_DIRECT, label, dirCode, token, lineNr);
 
@@ -4694,7 +4784,7 @@ void ParseDirective() {
                 strcpy(elfData, "\0\0\0\0\0\0\0\0");
                 addDataSectionData(elfData, dataAdr - dataAdrOld);
             }
-
+            sprintf(token, "%lld", value);
             // Write in SYMTAB
             addDirectiveToScope(SCOPE_DIRECT, label, dirCode, token, lineNr);
 

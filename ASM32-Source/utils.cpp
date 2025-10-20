@@ -34,6 +34,27 @@ void closeSourceFile() {
     fclose(inputFile);
 }
 
+void extract_path(const char* fullpath, char* path_out, size_t out_size) {
+    const char* last_slash = strrchr(fullpath, '/');
+    const char* last_backslash = strrchr(fullpath, '\\');
+    const char* sep = last_slash;
+
+    // On Windows, the last backslash may come after the last forward slash
+    if (last_backslash && (!sep || last_backslash > sep))
+        sep = last_backslash;
+
+    if (sep) {
+        size_t len = sep - fullpath;
+        if (len >= out_size)
+            len = out_size - 1; // truncate if too long
+        memcpy(path_out, fullpath, len);
+        path_out[len] = '\0';
+    }
+    else {
+        // No slash or backslash found — no path
+        path_out[0] = '\0';
+    }
+}
 
 // ====================================================================================
 //  Error Handling
@@ -59,7 +80,7 @@ void fatalError(const char* msg) {
 /// - Sets binary status to `B_NOBIN`.
 void processError(const char* msg) {
     lineERR = TRUE;
-
+    sourceERR = TRUE;
     strcpy(buffer, msg);
     strcat(buffer, "\n");
 
@@ -78,6 +99,18 @@ void processError(const char* msg) {
 /// - Links the warning node into the current SRC node hierarchy.
 /// - Sets binary status to `B_NOBIN`.
 void processWarning(const char* msg) {
+    strcpy(buffer, msg);
+    strcat(buffer, "\n");
+
+    searchSRC(GlobalSRC, 0);
+
+    bin_status = B_NOBIN;
+    SRCerror = createSRCnode(SRC_WARNING, buffer, lineNr);
+
+    addSRCchild(SRCcurrent, SRCerror);
+}
+
+void processInfo(const char* msg) {
     strcpy(buffer, msg);
     strcat(buffer, "\n");
 

@@ -1,41 +1,36 @@
-source Test.s
+source D:\Dokumente\Development\repos\ASM32\ASM32\Test.s
 
-Assembler start A.00.1.23
+Assembler start A.00.2.09
 
 --------------------------------------------------------------------------------------
+# of AST runs required:  2
 
 
 +------------------------------------------------------------------------------------+
 |                           SYMBOL TABLE                                             |
 +------------------------------------------------------------------------------------+
-Node    Scope   CAdr    DAdr    label   Base Func       value   VarType linenr  ScopeName
+Node  Line ADDR      Base Label    Funct. Value
 +------------------------------------------------------------------------------------+
-P:      1       0000    0000    GLOBAL                  Test.   0       1
--->Source File: Test.s
- D:     1       0000    0000    DP           REG        R13     0       1
- D:     1       0000    0000    RL           REG        R14     0       1
- D:     1       0000    0000    SP           REG        R15     0       1
- D:     1       0000    0000    ARG0         REG        R11     0       1
- D:     1       0000    0000    ARG1         REG        R10     0       1
- D:     1       0000    0000    ARG2         REG        R9      0       1
- D:     1       0000    0000    ARG3         REG        R8      0       1
- D:     1       0000    0000    RET0         REG        R11     0       1
- D:     1       0000    0000    RET1         REG        R10     0       1
- D:     1       0000    0000    RET2         REG        R9      0       1
- D:     1       0000    0000    RET3         REG        R8      0       1
- D:     1       0000    0000    STARTREG     REG        R1      0       8
- D:     1       0000    0000    FOO_BAR      EQU        47      0       9
- D:     1       0000    0000    CODE1        LABEL              0       12
- D:     1       ff0000  0000    BUFF     R8  BUFFER     EOL     0       16
- D:     1       ff0000  0008    S_1      R8  STRING     HALLO   0       17
- D:     1       ff0000  0010    WORD_01  R8  WORD       EOL     1       18
- D:     1       ff0000  0000    B1       R4  BYTE       16      1       22
- D:     1       ff0000  0010    H1       R4  HALF       EOL     1       24
- D:     1       ff0000  0018    D1       R4  DOUBLE     EOL     1       25
- D:     1       ff0000  0020    AB_C1    R4  LABEL              0       27
- D:     1       ff0014  0000    X        R4  LABEL              0       32
- D:     1       ff0024  0000    CODE2    R4  LABEL              0       37
- D:     1       2004    0000    Y        R4  LABEL              0       40
+P        1                GLOBAL          D:\Dokumente\Development\repos\ASM32\ASM32\Test.s
+D        1                DP       REG    R13
+D        1                RL       REG    R14
+D        1                SP       REG    R15
+D        1                ARG0     REG    R11
+D        1                ARG1     REG    R10
+D        1                ARG2     REG    R9
+D        1                ARG3     REG    R8
+D        1                RET0     REG    R11
+D        1                RET1     REG    R10
+D        1                RET2     REG    R9
+D        1                RET3     REG    R8
+D       10            R8  DATA1    DATA
+D       12 0000 0000  R8  BUFF     BUFFER
+D       13 0000 1388  R8  S1       STRING HALLO
+D       14 0000 1390  R8  W1       WORD   19088743
+D       18                SUB1     CODE
+D       20 0000 1000      SUB_START LABEL
+D       25                MAIN     CODE
+D       28 0000 0008      Y        LABEL
 
 
 +-----------------------------------------------------------------------------------+
@@ -43,66 +38,61 @@ P:      1       0000    0000    GLOBAL                  Test.   0       1
 +-----------------------------------------------------------------------------------+
 Name             Type StartAddr  EndAddr    Len
 --------------------------------------------------------------------------------------
-DATA1            D    00000030   0000003f   15
-CODE2            T    00002000   00002010   16
-DATA2            D    00030000   0003000b   11
-CODE1            T    00ff0000   00ff0024   36
+MAIN             T    00000000   00000018   24
+SUB1             T    00001000   0000100c   12
+DATA1            D    00010000   00011392   5010
 
 
 +------------------------------------------------------------------------------------+
 |                           SOURCE LISTING                                           |
 +------------------------------------------------------------------------------------+
+Program: D:\Dokumente\Development\repos\ASM32\ASM32\Test.s
+--------------------------------------------------------------------------------------
 CAdr Code       Line Source
 +------------------------------------------------------------------------------------+
-                             Program: Test.s
---------------------------------------------------------------------------------------
                       1 ; ======================================
                       2 ; Example program ASM32 Bootstrap Mode
                       3 ; ======================================
-                      4 ;  Global area
+                      4 ; Test long branch
                       5 ; ======================================
                       6
                       7                     .GLOBAL
-                      8 StartReg:           .REG    R1
-                      9 Foo_Bar:            .EQU    47
-                     10
-                     11
-                     12 CODE1:              .CODE addr=0x00FF_0000,align=0x0000_1000,entry
-                     13
-                     14 DATA1:              .DATA addr=0x0000_0030,align=0x0000_0010,base=R8
+                      8
+                      9 ; =====================================================================
+                     10 DATA1:              .DATA addr=0x0001_0000,align=0x0000_0010,base=R8
+                     11 ; =====================================================================
+                     12 BUFF:               .BUFFER size=5000,init=0x99
+                     13 S1:                 .STRING "HALLO"
+                     14 W1:                 .WORD 0x0123_4567
                      15
-                     16 BUFF:               .BUFFER size=5,init=0x99
-                     17 S_1:                .STRING "HALLO"
-                     18 Word_01:            .WORD 0x0123_4567
-                     19
-                     20 DATA2:              .DATA addr=0x0003_0000,align=0x0001_0000,base=r4
-                     21
-                     22 B1:                 .BYTE 16
-                     23                     .ALIGN 16
-                     24 H1:                 .HALF 0x0123
-                     25 D1:                 .DOUBLE 0x0123_4567_89ab_cdef
-                     26 AB_C1:
- 00ff0000 44490023   27                     ADCH    R1,R2(R3)
- 00ff0004 4040002f   28                     ADD     R1,Foo_Bar
- 00ff0008 404e0108   29                     ADD     R1,Word_01
- 00ff000c 80000002   30                     B       X
- 00ff0010 44540012   31                     ADC.O   StartReg,R2
- 00ff0014 404e0004   32 X:                  ADD     R1,B1
- 00ff0018 44a3ffd1   33                     ADC.L   R2,-47
- 00ff001c 803ffff9   34                     B       AB_C1
- 00ff0020 803ffffd   35                     B       X
-                     36
-                     37 CODE2:              .CODE addr=0x0000_2000,align=0x000_1000,
-                     38
- 00002000 44c90045   39                     ADCH    R3,R4(R5)
- 00002004 404e0104   40 Y:                  ADD     R1,H1
- 00002008 44a3ffd1   41                     ADC.L   R2,-47
- 0000200c 40440012   42                     ADD     R1,R2
-                     43                     .END
+                     16
+                     17 ; =====================================================================
+                     18 SUB1:               .CODE addr=0x0000_1000,align=0x0000_1000
+                     19 ; =====================================================================
+ 00001000 803fffff   20 SUB_START:          B    Y
+ 00001004 04400010   21                     LDIL R1,L%16384
+ 00001008 44490023   22                     ADCH    R1,R2(R3)
+                     23
+                     24 ; =====================================================================
+                     25 MAIN:              .CODE addr=0x0000_0000,entry
+                     26 ; =====================================================================
+                     27                    ADD     R5,W1
+ 00000000 0a001000   27        offset: -->  ADDIL R8,L%5008
+ 00000004 414e3901   27        offset: -->  <OPCODE> R5,R%5008(R1)
+ 00000008 800003fe   28 Y:                    B       SUB_START
+ 0000000c 9803fd23   29                    CBR.EQ   R2,R3,SUB_START
+                     30
+                     31
+                     32 ;                    LDIL R1,L%4026531836
+ 00000010 04400000   33                     LDIL R1,L%0xFF00_0000
+ 00000014 9000ff01   34                     BE R%4026531836(R0,R1)
+
+
+ELF File: D:\Dokumente\Development\repos\ASM32\ASM32\ASM32.out
 
 
 +------------------------------------------------------------------------------------+
-|                           ELF FILE                                           |
+|                           ELF FILE                                                 |
 +------------------------------------------------------------------------------------+
 ELF Header
 
@@ -114,73 +104,66 @@ ELF Header
   Type:       Executable file
   Machine:    Advanced Micro Devices X86-64 processor
   Version:    Current
-  Entry:      0xff0000
+  Entry:      0x0
   Flags:      0x0
 
 Section Headers:
 [  Nr ] Type              Addr       Size       ES   Flg Lk   Inf   Al   Name
 [    0] NULL              0x00000000 0x00000000 0x00     0x00 0x000 0x00
-[    1] STRTAB            0x00000000 0x00000041 0x00     0x00 0x000 0x01 .shstrtab
-[    2] PROGBITS          0x00000030 0x00000014 0x00 WA  0x00 0x000 0x04 .data.DATA1
-[    3] PROGBITS          0x00030000 0x00000011 0x00 WA  0x00 0x000 0x04 .data.DATA2
-[    4] PROGBITS          0x00ff0000 0x00000024 0x00 AX  0x00 0x000 0x10 .text.CODE1
-[    5] PROGBITS          0x00002000 0x00000010 0x00 AX  0x00 0x000 0x10 .text.CODE2
-[    6] NOTE              0x00000000 0x00000038 0x00     0x00 0x000 0x01 .note
+[    1] STRTAB            0x00000000 0x00000033 0x00     0x00 0x000 0x01 .shstrtab
+[    2] PROGBITS          0x00010000 0x00001394 0x00 WA  0x00 0x000 0x04 .data.DATA1
+[    3] PROGBITS          0x00001000 0x0000000c 0x00 AX  0x00 0x000 0x10 .text.SUB1
+[    4] PROGBITS          0x00000000 0x00000018 0x00 AX  0x00 0x000 0x10 .text.MAIN
+[    5] NOTE              0x00000000 0x00000038 0x00     0x00 0x000 0x01 .note
 Key to Flags: W (write), A (alloc), X (execute),
               M (merge), S (strings), I (info),
               L (link order), O (extra OS processing required),
               G (group), T (TLS), C (compressed), E (exclude)
 Program Headers:
 [  Nr ] Type           VirtAddr   PhysAddr   FileSize   Mem.Size   Flags    Align
-[    0] LOAD           0x00000030 0x00000030 0x00000014 0x00000014 RW       0x00000010
-[    1] LOAD           0x00030000 0x00030000 0x00000011 0x00000011 RW       0x00010000
-[    2] LOAD           0x00ff0000 0x00ff0000 0x00000024 0x00000024 R E      0x00001000
-[    3] LOAD           0x00002000 0x00002000 0x00000010 0x00000010 R E      0x00001000
+[    0] LOAD           0x00010000 0x00010000 0x00001394 0x00001394 RW       0x00000010
+[    1] LOAD           0x00001000 0x00001000 0x0000000c 0x0000000c R E      0x00001000
+[    2] LOAD           0x00000000 0x00000000 0x00000018 0x00000018 R E      0x00001000
 
 [0] .data.DATA1
-[1] .data.DATA2
-[2] .text.CODE1
-[3] .text.CODE2
+[1] .text.SUB1
+[2] .text.MAIN
 
 Note section (.note)
     No Name         Data size  Description
   [ 0] Created by ASM32 0x00000000 0x00000001
-  [ 1] A.00.1.23    0x00000000 0x00000001
+  [ 1] A.00.2.09    0x00000000 0x00000001
 
 Section Data:
 .shstrtab
 [0x00000000] 0x00 0x2e 0x73 0x68 0x73 0x74 0x72 0x74 0x61 0x62 0x00 0x2e 0x64 0x61 0x74 0x61
-[0x00000010] 0x2e 0x44 0x41 0x54 0x41 0x31 0x00 0x2e 0x64 0x61 0x74 0x61 0x2e 0x44 0x41 0x54
-[0x00000020] 0x41 0x32 0x00 0x2e 0x74 0x65 0x78 0x74 0x2e 0x43 0x4f 0x44 0x45 0x31 0x00 0x2e
-[0x00000030] 0x74 0x65 0x78 0x74 0x2e 0x43 0x4f 0x44 0x45 0x32 0x00 0x2e 0x6e 0x6f 0x74 0x65
+[0x00000010] 0x2e 0x44 0x41 0x54 0x41 0x31 0x00 0x2e 0x74 0x65 0x78 0x74 0x2e 0x53 0x55 0x42
+[0x00000020] 0x31 0x00 0x2e 0x74 0x65 0x78 0x74 0x2e 0x4d 0x41 0x49 0x4e 0x00 0x2e 0x6e 0x6f
+[0x00000030] 0x74 0x65 0x00
 .data.DATA1
-[0x00000000] 0x99 0x99 0x99 0x99 0x99 0x00 0x00 0x00 0x48 0x41 0x4c 0x4c 0x4f 0x00 0x00 0x41
-[0x00000010] 0x01 0x23 0x45 0x67
-.data.DATA2
-[0x00000000] 0x10 0x01 0x23 0x00 0x23 0x45 0x67 0x4f 0x00 0x01 0x23 0x45 0x67 0x89 0xab 0xcd
-[0x00000010] 0xef
-.text.CODE1
-[0x00000000] 0x44 0x49 0x00 0x23 0x40 0x40 0x00 0x2f 0x40 0x4e 0x01 0x08 0x80 0x00 0x00 0x02
-[0x00000010] 0x44 0x54 0x00 0x12 0x40 0x4e 0x00 0x04 0x44 0xa3 0xff 0xd1 0x80 0x3f 0xff 0xf9
-[0x00000020] 0x80 0x3f 0xff 0xfd
-.text.CODE2
-[0x00000000] 0x44 0xc9 0x00 0x45 0x40 0x4e 0x01 0x04 0x44 0xa3 0xff 0xd1 0x40 0x44 0x00 0x12
+[0x00000000] 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99
+[0x00000010] 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99
+[0x00000020] 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99
+[0x00000030] 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99
+.text.SUB1
+[0x00000000] 0x80 0x3f 0xff 0xff 0x04 0x40 0x00 0x10 0x44 0x49 0x00 0x23
+.text.MAIN
+[0x00000000] 0x0a 0x00 0x10 0x00 0x41 0x4e 0x39 0x01 0x80 0x00 0x03 0xfe 0x98 0x03 0xfd 0x23
+[0x00000010] 0x04 0x40 0x00 0x00 0x90 0x00 0xff 0x01
 .note
 [0x00000000] 0x00 0x00 0x00 0x11 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x01 0x43 0x72 0x65 0x61
 [0x00000010] 0x74 0x65 0x64 0x20 0x62 0x79 0x20 0x41 0x53 0x4d 0x33 0x32 0x00 0x00 0x00 0x00
 [0x00000020] 0x00 0x00 0x00 0x0a 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x01 0x41 0x2e 0x30 0x30
-[0x00000030] 0x2e 0x31 0x2e 0x32 0x33 0x00 0x00 0x00
+[0x00000030] 0x2e 0x32 0x2e 0x30 0x39 0x00 0x00 0x00
 
 Segment Data:
 Segment # 0
-[0x00000000] 0x99 0x99 0x99 0x99 0x99 0x00 0x00 0x00 0x48 0x41 0x4c 0x4c 0x4f 0x00 0x00 0x41
-[0x00000010] 0x01 0x23 0x45 0x67
+[0x00000000] 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99
+[0x00000010] 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99
+[0x00000020] 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99
+[0x00000030] 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99 0x99
 Segment # 1
-[0x00000000] 0x10 0x01 0x23 0x00 0x23 0x45 0x67 0x4f 0x00 0x01 0x23 0x45 0x67 0x89 0xab 0xcd
-[0x00000010] 0xef
+[0x00000000] 0x80 0x3f 0xff 0xff 0x04 0x40 0x00 0x10 0x44 0x49 0x00 0x23
 Segment # 2
-[0x00000000] 0x44 0x49 0x00 0x23 0x40 0x40 0x00 0x2f 0x40 0x4e 0x01 0x08 0x80 0x00 0x00 0x02
-[0x00000010] 0x44 0x54 0x00 0x12 0x40 0x4e 0x00 0x04 0x44 0xa3 0xff 0xd1 0x80 0x3f 0xff 0xf9
-[0x00000020] 0x80 0x3f 0xff 0xfd
-Segment # 3
-[0x00000000] 0x44 0xc9 0x00 0x45 0x40 0x4e 0x01 0x04 0x44 0xa3 0xff 0xd1 0x40 0x44 0x00 0x12
+[0x00000000] 0x0a 0x00 0x10 0x00 0x41 0x4e 0x39 0x01 0x80 0x00 0x03 0xfe 0x98 0x03 0xfd 0x23
+[0x00000010] 0x04 0x40 0x00 0x00 0x90 0x00 0xff 0x01

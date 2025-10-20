@@ -178,8 +178,8 @@ int addNote() {
 /// Sets the ELF entry point to the global entry point and writes
 /// the final ELF binary (`ASM32.out`) to disk.
 /// \return 0 on success.
-int writeElfFile() {
+int writeElfFile(char* file) {
     writer.set_entry(elfEntryPoint);
-    writer.save("ASM32.out");
+    writer.save(file);
     return 0;
 }

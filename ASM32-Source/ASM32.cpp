@@ -27,8 +27,9 @@ char        sl[MAX_LINE_LENGTH];            ///< Raw input buffer holding the cu
 int         prgType;                        ///< Program type: 0 = undefined, 1 = standalone, 2 = module.
 char        token[MAX_WORD_LENGTH];         ///< Current token text.
 char        tokenSave[MAX_WORD_LENGTH];     ///< Previously seen token text (look-behind).
-char        dataSegmentBase[3];             ///< Restitername of actual data segment;
+char        dataSegmentBase[8];             ///< Registername of actual data segment;
 char        baseRegData[5]; 
+char        currentSegment[50];             ///< actual code segment name
 int         tokTyp;                         ///< Current token type (see TokenType).
 int         tokTypSave;                     ///< Previous token type (look-behind).
 int         numToken;                       ///< Integer value parsed from a numeric token.
@@ -36,24 +37,27 @@ int64_t     value;                          ///< Evaluated numeric value from an
 int         align_val;                      ///< Alignment value for directives that require alignment.
 int         mode;                           ///< Mode for arithmetic or addressing operations.
 bool        lineERR;                        ///< Flag: true if the current line is in error.
+bool        sourceERR = FALSE;                      ///< Flag: true if the source has an error.
 char        label[MAX_WORD_LENGTH];         ///< Most recent label text.
 char        labelCodeOld[MAX_WORD_LENGTH];
 char        labelDataOld[MAX_WORD_LENGTH];
+char        currentCODE[MAX_WORD_LENGTH];
 int         ind = 0;                        ///< Scanner index into the source line during tokenization.
 char        opCode[MAX_WORD_LENGTH];        ///< Opcode mnemonic.
 int         opInstrType;                    ///< Opcode type (maps to opCodeTab[].instrType).
 int         operandType;                    ///< Operand classification used for AST construction.
-int         operandTyp[10];                 ///< Operand types used by code generation.
+int         operandTyp[MAX_WORD_LENGTH];                 ///< Operand types used by code generation.
 int         directiveType;                  ///< Current directive kind (see Directives).
 char        dirCode[MAX_WORD_LENGTH];       ///< Directive mnemonic (as text).
 int         varType;                        ///< Variable classification: 0 = none, 1 = global, 2 = local.
 char        varName[MAX_WORD_LENGTH];       ///< Name of a global/local variable.
-char        buffer[255];                    ///< General-purpose text buffer.
-int         symcodeAdr;                     ///< Code address associated with a symbol table entry.
+char        buffer[MAX_LINE_LENGTH];                    ///< General-purpose text buffer.
+int64_t     symcodeAdr;                     ///< Code address associated with a symbol table entry.
 int         bin_status;                     ///< Binary status for instructions stored in SRC nodes.
 int         numOfInstructions=0;              ///< counter # of instruction bytes in segment
 int         numOfData;                      ///< counter # of data bytes in segment
-
+bool        addInstrGlob;                       ///< Flag is TRUE if during assembly additional instrtuctions generated globally
+bool        addInstrLine;                   ///< Flag is true if during assembly additional instrtuctions generated for actual source line
 bool        codeInstrFlag = FALSE;          ///< Flag if .CODE or instruction was read in AST
 int         nodeTypeOld;                     ///< old node type 
 bool        codeExist = FALSE;              ///< flag if a .CODE directive is present before first instruction    
@@ -66,11 +70,11 @@ bool        is_label;                       ///< Parser helper: current statemen
 bool        is_instruction;                 ///< Parser helper: current statement is an instruction.
 bool        is_directive;                   ///< Parser helper: current statement is a directive.
 bool        is_negative;                    ///< Parser helper: next numeric literal is negated.
-
+int AST_numInstr;                           ///< contains current AST node numInstr.
 int         binInstr;                       ///< Current 32-bit binary instruction being emitted.
 int         binInstrSave;                   ///< Saved binary instruction (e.g., for large offset fixups).
-int         codeAdr;                        ///< Code address (text section address counter).
-int         dataAdr;                        ///< Data address (data section address counter).
+uint32_t         codeAdr;                        ///< Code address (text section address counter).
+uint32_t         dataAdr;                        ///< Data address (data section address counter).
 
 uint32_t    elfCodeAddr;                    ///< ELF: base virtual address of the text section.
 uint32_t    elfCodeAddrOld;
@@ -92,13 +96,15 @@ int         elfBufferSize = 4096;           ///< Size of the data buffer allocat
 char        func_entry[MAX_WORD_LENGTH];    ///< Name of the function currently being processed.
 bool        main_func_detected;             ///< True once a 'main' function (or equivalent) is detected.
 
-char        opchar[5][10];                  ///< Codegen staging: textual operands collected from the AST.
+char        opchar[5][MAX_WORD_LENGTH];                  ///< Codegen staging: textual operands collected from the AST.
 int         opnum[5];                       ///< Codegen staging: numeric operands collected from the AST.
-char        option[2][10];                  ///< Codegen staging: instruction options/modifiers collected from the AST.
+char        option[2][MAX_WORD_LENGTH];                  ///< Codegen staging: instruction options/modifiers collected from the AST.
 int         opCount = 0;                    ///< Codegen staging: number of collected operands.
 int         optCount = 0;                   ///< Codegen staging: number of collected options.
 
-char        SourceFileName[255];            ///< Input source filename (.s / .asm).
+char        symPrint[132];                  ///< printf param for symtab print
+
+char        SourceFileName[MAX_FILE_NAME_LENGTH];            ///< Input source filename (.s / .asm).
 FILE* inputFile;                            ///< Open handle for the input source file.
 
 // --------------------------------------------------------------------------------
@@ -109,7 +115,7 @@ bool DBG_TOKEN = FALSE;  ///< Dump tokens produced by the lexer.
 bool DBG_PARSER = FALSE; ///< Trace parser decisions.
 bool DBG_GENBIN = FALSE; ///< Trace binary generation.
 bool DBG_SYMTAB = TRUE;  ///< Dump symbol table after codegen.
-bool DBG_AST = FALSE;     ///< Dump abstract syntax tree after parsing.
+bool DBG_AST = FALSE;  ///< Dump abstract syntax tree after parsing.
 bool DBG_SEGMENT = TRUE; ///< Dump segment table
 bool DBG_SOURCE = TRUE;  ///< Print source listing with addresses and binary.
 bool DBG_ELF = TRUE;     ///< Dump ELF file
@@ -123,6 +129,16 @@ bool DBG_ELF = TRUE;     ///< Dump ELF file
 struct tokenList* next_t = NULL;            ///< Tail insertion helper.
 struct tokenList* start_t = NULL;           ///< Head of the token list.
 struct tokenList* ptr_t;                    ///< Iteration pointer over the token list.
+
+// --------------------------------------------------------------------------------
+/** \name BIN list
+ *  \brief Linked list built by the codegenfrom AST and consumed by the ELF adn SRC list
+ */
+ // --------------------------------------------------------------------------------
+
+struct BINList* next_b = NULL;         ///< Next BIN pointer
+struct BINList* start_b = NULL;        ///< Start of BIN list
+struct BINList* ptr_b;          ///< General BIN pointer
 
 // --------------------------------------------------------------------------------
 /** \name Symbol table
@@ -203,6 +219,29 @@ SegmentTableEntry table[MAX_ENTRIES];
 //      Subroutines
 // --------------------------------------------------------------------------------
 
+
+void printBIN() {
+
+    ptr_b = start_b;
+
+    while (ptr_b != NULL) {
+
+        printf("Type %d lineNr %d CodeAdr %x Instr %x BINSTAT %d\n", ptr_b->b_type, ptr_b->b_lineNr, ptr_b->b_codeAdr, ptr_b->b_binInstr, ptr_b->b_bin_status);
+
+        if (ptr_b != NULL) {
+            ptr_b = ptr_b->next;
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
 // Function to add a segment table entry
 int  addSegmentEntry(int index, const char* name, char type, int addr, int len) {
     if (index < 0 || index >= MAX_ENTRIES) {
@@ -213,7 +252,9 @@ int  addSegmentEntry(int index, const char* name, char type, int addr, int len) 
 
     table[index].type = type;
     table[index].addr = addr;
-    table[index].len = len;
+    if (len > 0) {
+        table[index].len = len;
+    }
     return 0;
 }
 
@@ -230,7 +271,7 @@ void printSegmentTable(int count) {
     printf("%-16s %-4s %-10s %-10s %-10s\n", "Name", "Type", "StartAddr", "EndAddr", "Len");
     printf("--------------------------------------------------------------------------------------\n");
 
-    for (int i = 1; i < count; i++) {
+    for (int i = 0; i < count; i++) {
         printf("%-16s %-4c %08x   %08x   %-10d\n",
             table[i].name,
             table[i].type,
@@ -239,6 +280,8 @@ void printSegmentTable(int count) {
             table[i].len);
     }
 }
+
+
 
 // --------------------------------------------------------------------------------
 //      Set default EQU and REG
@@ -319,13 +362,13 @@ SRCNode* createSRCnode(SRC_NodeType type, const char* text, int lineNr) {
     if (node == NULL) {
         fatalError("malloc failed");
     }
-    node->type = type;
-    node->linenr = lineNr;
-    node->binStatus = bin_status;
-    node->text = strdup(text);
+    node->s_type = type;
+    node->s_lineNr = lineNr;
+    node->s_binStatus = bin_status;
+    node->s_text = strdup(text);
     node->children = NULL;
-    node->childCount = 0;
-    node->codeAdr = codeAdr;
+    node->s_childCount = 0;
+    node->s_codeAdr = codeAdr;
     return node;
 }
 
@@ -333,11 +376,11 @@ SRCNode* createSRCnode(SRC_NodeType type, const char* text, int lineNr) {
 /// \param parent Parent node to receive the child.
 /// \param child Child node to append (ownership transferred).
 void addSRCchild(SRCNode* parent, SRCNode* child) {
-    parent->children = (SRCNode**)realloc(parent->children, sizeof(SRCNode*) * (parent->childCount + 1));
+    parent->children = (SRCNode**)realloc(parent->children, sizeof(SRCNode*) * (parent->s_childCount + 1));
     if (parent->children == NULL) {
         fatalError("realloc failed");
     }
-    parent->children[parent->childCount++] = child;
+    parent->children[parent->s_childCount++] = child;
 }
 
 /// \brief Locate the current source node (matching ::lineNr) within the source tree.
@@ -349,12 +392,12 @@ void searchSRC(SRCNode* node, int depth) {
 
     if (!node) return;
 
-    if (node->type == SRC_SOURCE &&
-        node->linenr == lineNr) {
+    if (node->s_type == SRC_SOURCE &&
+        node->s_lineNr == lineNr) {
         SRCcurrent = node;
     }
 
-    for (int i = 0; i < node->childCount; i++) {
+    for (int i = 0; i < node->s_childCount; i++) {
         searchSRC(node->children[i], depth + 1);
     }
 
@@ -370,15 +413,15 @@ void insertBinToSRC(SRCNode* node, int depth) {
 
     if (!node) return;
 
-    if (node->type == SRC_SOURCE &&
-        node->linenr == lineNr) {
+    if (node->s_type == SRC_SOURCE &&
+        node->s_lineNr == lineNr) {
 
-        node->codeAdr = codeAdr - 4;
-        node->binInstr = binInstr;
-        node->binStatus = bin_status;
+        node->s_codeAdr = codeAdr - 4;
+        node->s_binInstr = binInstr;
+        node->s_binStatus = bin_status;
     }
 
-    for (int i = 0; i < node->childCount; i++) {
+    for (int i = 0; i < node->s_childCount; i++) {
         insertBinToSRC(node->children[i], depth + 1);
     }
 
@@ -391,36 +434,39 @@ void printSourceListing(SRCNode* node, int depth) {
 
     if (!node) return;
 
-    if (node->linenr != 0) {
-        if (node->type == SRC_ERROR) {
-            printf("                        E: \t%s", node->text);
+    if (node->s_lineNr != 0) {
+        if (node->s_type == SRC_ERROR) {
+            printf("                        Error->\t%s\n", node->s_text);
         }
-        else if (node->type == SRC_WARNING) {
-            printf("                        W: \t%s", node->text);
+        else if (node->s_type == SRC_WARNING) {
+            printf("                        W: \t%s", node->s_text);
         }
-        else if (node->type == SRC_SOURCE &&
-            node->binStatus == B_BIN) {
-            printf(" %08x %08x %4d %s", node->codeAdr, node->binInstr, node->linenr, node->text);
+        else if (node->s_type == SRC_SOURCE &&
+            node->s_binStatus == B_BIN) {
+            printf(" %08x %08x %4d %s", node->s_codeAdr, node->s_binInstr, node->s_lineNr, node->s_text);
         }
-        else if (node->type == SRC_BIN &&
-            node->binStatus == B_BINCHILD) {
-            printf(" %08x %08x %4d %s", node->codeAdr, node->binInstr, node->linenr, node->text);
+        else if (node->s_type == SRC_BIN &&
+            node->s_binStatus == B_BINCHILD) {
+            printf(" %08x %08x %4d %s", node->s_codeAdr, node->s_binInstr, node->s_lineNr, node->s_text);
         }
-        else if (node->type == SRC_SOURCE &&
-            node->binStatus == B_NOBIN) {
-            printf("                   %4d %s", node->linenr, node->text);
+        else if (node->s_type == SRC_SOURCE &&
+            node->s_binStatus == B_NOBIN) {
+            printf("                   %4d %s", node->s_lineNr, node->s_text);
         }
-        else if (node->type == SRC_INFO) {
-            printf("                        I:  %s", node->text);
+        else if (node->s_type == SRC_INFO) {
+            printf("                        I:  %s", node->s_text);
         }
     }
     else {
 
-        printf("                             Program: %s", node->text);
+        printf("Program: %s", node->s_text);
         printf("--------------------------------------------------------------------------------------\n");
+        printf("CAdr Code       Line Source\n");
+        printf("+------------------------------------------------------------------------------------+ \n");
+
     }
 
-    for (int i = 0; i < node->childCount; i++) {
+    for (int i = 0; i < node->s_childCount; i++) {
         printSourceListing(node->children[i], depth + 1);
     }
 }
@@ -433,26 +479,26 @@ void copyToELF(SRCNode* node, int depth) {
 
     if (!node) return;
 
-    if (node->linenr != 0) {
+    if (node->s_lineNr != 0) {
 
-        if (node->type == SRC_SOURCE &&
-            node->binStatus == B_BIN) {
-            elfCode[0] = (node->binInstr >> 24) & 0xFF;
-            elfCode[1] = (node->binInstr >> 16) & 0xFF;
-            elfCode[2] = (node->binInstr >> 8) & 0xFF;
-            elfCode[3] = node->binInstr & 0xFF;
+        if (node->s_type == SRC_SOURCE &&
+            node->s_binStatus == B_BIN) {
+            elfCode[0] = (node->s_binInstr >> 24) & 0xFF;
+            elfCode[1] = (node->s_binInstr >> 16) & 0xFF;
+            elfCode[2] = (node->s_binInstr >> 8) & 0xFF;
+            elfCode[3] = node->s_binInstr & 0xFF;
             addTextSectionData();
         }
-        else if (node->type == SRC_BIN &&
-            node->binStatus == B_BINCHILD) {
-            elfCode[0] = (node->binInstr >> 24) & 0xFF;
-            elfCode[1] = (node->binInstr >> 16) & 0xFF;
-            elfCode[2] = (node->binInstr >> 8) & 0xFF;
-            elfCode[3] = node->binInstr & 0xFF;
+        else if (node->s_type == SRC_BIN &&
+            node->s_binStatus == B_BINCHILD) {
+            elfCode[0] = (node->s_binInstr >> 24) & 0xFF;
+            elfCode[1] = (node->s_binInstr >> 16) & 0xFF;
+            elfCode[2] = (node->s_binInstr >> 8) & 0xFF;
+            elfCode[3] = node->s_binInstr & 0xFF;
             addTextSectionData();
         }
     }
-    for (int i = 0; i < node->childCount; i++) {
+    for (int i = 0; i < node->s_childCount; i++) {
         copyToELF(node->children[i], depth + 1);
     }
 }
@@ -480,6 +526,8 @@ int main(int argc, char** argv) {
         printf("Usage: %s <filename>\n", argv[0]);
         return 1;
     }
+
+
     strcpy(SourceFileName, argv[1]);
     openSourceFile();
 
@@ -525,10 +573,10 @@ int main(int argc, char** argv) {
         while (tokTyp != T_EOL) {
             createToken();
             createTokenEntry();
-            ptr_t->lineNumber = lineNr;
-            ptr_t->column = column + 1;
-            strcpy(ptr_t->token, token);
-            ptr_t->tokTyp = tokTyp;
+            ptr_t->t_lineNr = lineNr;
+            ptr_t->t_column = column + 1;
+            strcpy(ptr_t->t_token, token);
+            ptr_t->t_tokTyp = tokTyp;
         }
 
         lineNr++;
@@ -536,10 +584,10 @@ int main(int argc, char** argv) {
 
     // Append explicit end-of-input token.
     createTokenEntry();
-    ptr_t->lineNumber = lineNr;
-    ptr_t->column = 0;
-    strcpy(ptr_t->token, "");
-    ptr_t->tokTyp = EOF;
+    ptr_t->t_lineNr = lineNr;
+    ptr_t->t_column = 0;
+    strcpy(ptr_t->t_token, "");
+    ptr_t->t_tokTyp = EOF;
 
     printTokenList();
 
@@ -588,9 +636,9 @@ int main(int argc, char** argv) {
         is_label = FALSE;
         is_instruction = FALSE;
         is_directive = FALSE;
-        strcpy(tokenSave, ptr_t->token);
+        strcpy(tokenSave, ptr_t->t_token);
 
-        if (ptr_t->tokTyp == T_IDENTIFIER) {
+        if (ptr_t->t_tokTyp == T_IDENTIFIER) {
             fetchToken();
             if (tokTyp == T_COLON) {
                 is_label = TRUE;
@@ -599,10 +647,10 @@ int main(int argc, char** argv) {
                 is_instruction = TRUE;
             }
         }
-        else if (ptr_t->tokTyp == T_DOT) {
+        else if (ptr_t->t_tokTyp == T_DOT) {
             fetchToken();
             if (tokTyp == T_IDENTIFIER) {
-                strcpy(tokenSave, ptr_t->token);
+                strcpy(tokenSave, ptr_t->t_token);
                 is_directive = TRUE;
             }
         }
@@ -611,7 +659,7 @@ int main(int argc, char** argv) {
             parseLabel();
         }
         if (is_instruction == TRUE) {
-            tokTyp = ptr_t->tokTyp;
+            tokTyp = ptr_t->t_tokTyp;
             parseInstruction();
         }
         if (is_directive == TRUE) {
@@ -620,7 +668,7 @@ int main(int argc, char** argv) {
 
         if (lineERR == TRUE) {
             // Skip to end of line after an error to resynchronize.
-            while (ptr_t->tokTyp != T_EOL) {
+            while (ptr_t->t_tokTyp != T_EOL) {
                 ptr_t = ptr_t->next;
                 if (ptr_t == NULL)  break;
             }
@@ -643,25 +691,67 @@ int main(int argc, char** argv) {
 
     binInstr = 0;
     codeAdr = 0;
+    addInstrGlob = TRUE;
 
-    processAST(ASTprogram, 0);
+    int numAST = 0;
+    while (addInstrGlob == TRUE) {
+        addInstrGlob = FALSE;
+        processAST(ASTprogram, 0);
+        numAST++;
 
+        if (addInstrGlob == TRUE) {
+            deleteBIN();
+            start_b = NULL;
+            codeAdr = 0;
+            nodeTypeOld = 0;
+
+        }
+    }
+    printf("# of AST runs required:  %d\n", numAST);
+    
+    // jetzt ist BINList fertig
+
+    processBIN();
+
+    // insert last data segment
     addSegmentEntry(numSegment, labelDataOld, 'D', elfDataAddrOld, numOfData);
     numSegment++;
     
-    addSegmentEntry(numSegment, labelCodeOld, 'T', elfCodeAddrOld, numOfInstructions * 4);
-    numSegment++;
+    // update number of instructions in old text segment
+    for (int i = 0; i < numSegment; i++) {
     
+        if ((strcmp(table[i].name, currentSegment) == 0) &&
+           (table[i].type = 'T')) {
+
+            table[i].len = numOfInstructions * 4;
+        }
+    }
+
 
 
     if (DBG_SYMTAB == TRUE) {
+
+        strcpy(symPrint, "%-5s %-9s %3s %-8s %-6s %-10s %-10s\n");
+
         printf("\n\n+------------------------------------------------------------------------------------+\n");
         printf("|                           SYMBOL TABLE                                             |\n");
         printf("+------------------------------------------------------------------------------------+ \n");
-        printf("Node\tScope\tCAdr\tDAdr\tlabel   Base Func\tvalue\tVarType\tlinenr\tScopeName\n");
+        printf("%-5s %-4s %-9s %-4s %-8s %-6s %-12s\n", "Node", "Line", "ADDR", "Base", "Label", "Funct.", "Value");
         printf("+------------------------------------------------------------------------------------+ \n");
-
         printSYM(GlobalSYM, 0);
+
+/*
+        codeAdr = 0x00000000;
+        strcpy(currentCODE, "CODE1");
+        updSYM(GlobalSYM,0);
+
+        printf("\n\n+------------------------------------------------------------------------------------+\n");
+        printf("|                           SYMBOL TABLE   nach update                               |\n");
+        printf("+------------------------------------------------------------------------------------+ \n");
+        printf("%-5s %-4s %-9s %-4s %-8s %-6s %-12s\n", "Node", "Line", "ADDR", "Base", "Label", "Funct.", "Value");
+        printf("+------------------------------------------------------------------------------------+ \n");
+        printSYM(GlobalSYM, 0);
+*/
     }
 
     if (DBG_AST == TRUE) {
@@ -678,7 +768,7 @@ int main(int argc, char** argv) {
     qsort(table, numSegment, sizeof(SegmentTableEntry), compareByAddr);
 
     // Check Segment table for overlap
-    for (int i = 1; i < numSegment -1; i++) {
+    for (int i = 1; i < numSegment -1 ; i++) {
         if ((table[i].addr + table[i].len) > table[i + 1].addr) {
             snprintf(errmsg, sizeof(errmsg), "Segment %s overlaps with segment %s", table[i].name, table[i+1].name);
             processError(errmsg);
@@ -700,8 +790,6 @@ int main(int argc, char** argv) {
         printf("\n\n+------------------------------------------------------------------------------------+\n");
         printf("|                           SOURCE LISTING                                           |\n");
         printf("+------------------------------------------------------------------------------------+ \n");
-        printf("CAdr Code       Line Source\n");
-        printf("+------------------------------------------------------------------------------------+ \n");
 
 
         printSourceListing(GlobalSRC, 0);
@@ -715,32 +803,43 @@ int main(int argc, char** argv) {
     //  Finalize ELF output
     // --------------------------------------------------------------------------------
 
-    addNote();
-    writeElfFile();
+    if (!sourceERR) {
+        addNote();
+        char path[MAX_FILE_NAME_LENGTH];
+        extract_path(SourceFileName, path, sizeof(path));
+        strcat(path, "\\ASM32.out");
+        printf("\n\nELF File: %s\n", path);
+        writeElfFile(path);
 
-    if (DBG_ELF == TRUE) {
+        if (DBG_ELF == TRUE) {
+            printf("\n\n+------------------------------------------------------------------------------------+\n");
+            printf("|                           ELF FILE                                                 |\n");
+            printf("+------------------------------------------------------------------------------------+ \n");
+
+            elfio reader;
+
+            if (!reader.load("ASM32.out")) {
+                printf("File %s is not found or it is not an ELF file\n", argv[1]);
+                return 1;
+            }
+
+            dump::header(std::cout, reader);
+            dump::section_headers(std::cout, reader);
+            dump::segment_headers(std::cout, reader);
+            dump::symbol_tables(std::cout, reader);
+            dump::notes(std::cout, reader);
+            dump::modinfo(std::cout, reader);
+            dump::dynamic_tags(std::cout, reader);
+            dump::section_datas(std::cout, reader);
+            dump::segment_datas(std::cout, reader);
+        }
+    }
+    else {
         printf("\n\n+------------------------------------------------------------------------------------+\n");
-        printf("|                           ELF FILE                                           |\n");
+        printf("|         no ELF File written due to error                                           |\n");
         printf("+------------------------------------------------------------------------------------+ \n");
 
-        elfio reader;
-
-        if (!reader.load("ASM32.out")) {
-            printf("File %s is not found or it is not an ELF file\n", argv[1]);
-            return 1;
-        }
-
-        dump::header(std::cout, reader);
-        dump::section_headers(std::cout, reader);
-        dump::segment_headers(std::cout, reader);
-        dump::symbol_tables(std::cout, reader);
-        dump::notes(std::cout, reader);
-        dump::modinfo(std::cout, reader);
-        dump::dynamic_tags(std::cout, reader);
-        dump::section_datas(std::cout, reader);
-        dump::segment_datas(std::cout, reader);
     }
-
     exit(0);
 
     // -------------------------------------------------------------------------------- 

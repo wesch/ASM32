@@ -23,7 +23,7 @@
 /// \param x   Value to be inserted.
 /// \param num Number of bits.
 
-void setBit(int pos, int x, int num) {
+void setBit(int pos, int32_t x, int num) {
     
     int limit = pow(2, num);
     if (x > (limit - 1) ||
@@ -54,40 +54,92 @@ void clrBit(int pos) {
 /// \param pos Position in the instruction.
 /// \param x   Offset value.
 /// \param num Number of bits available for encoding.
-void setOffset(int pos, int x, int len) {
+void setDataOffset(int pos, int offset, int len) {
     int num;
-//   x = 4096;   // Test for large offset
-    
     int limit = pow(2, len);
-    if (x > (limit - 1) ||
-        x < (-limit)) {
-        // aktuelle Instruction speichern
-        // neue instruction ADDIL DP,L%limit -> 0x0B400000 | 0xFFFFFC00 & x
-        // gespeicherte Instruction offset = R%limit Instruktion ->  SetBit(26, 0x3FF & x, 11);   
-        // regB = R1 -> SetRegister('B', opchar[2]);
-        // opNum[1] = 0 negative offset 
-        binInstrSave = binInstr;
-        binInstr = 0x0B400000 | (0xFFFFFC00 & x);
-        bin_status = B_BINCHILD;
-        strcpy(infmsg, "generated Instruction: ADDIL DP,L%limit due to offset > limit\n");
-        createBinary();   
+    addInstrLine = FALSE;
+    
+        if (offset > (limit - 1) ||
+            offset < (-limit)) {
+            // aktuelle Instruction speichern
+            // neue instruction 
+            // ADDIL basereg,L%limit -> 0x08000000 | 0xFFFFFC00 & x
+            // gespeicherte Instruction & 0xFFFFFFF0
+            // offset -> R%limit(R1)
+            // R%limit Instruktion ->  SetBit(26, 0x3FF & x, 11);   
+            // regB = R1 -> SetRegister('B', opchar[2]);
+            // opNum[1] = 0 negative offset 
+            binInstrSave = binInstr;
+            // ADDIL 
+            binInstr = 0x08000000 | (0xFFFFFC00 & offset);
+            // adjust basereg 
 
-        codeAdr = codeAdr + 4;
-        binInstr = binInstrSave;
-        binInstr = binInstr & 0xFFFFFFF0;
-        strcpy(opchar[2], "R1");
-        strcpy(infmsg, "modified Instruction offset regB -> R1, R%limit \n");
+            setGenRegister('R', baseRegData);
+            bin_status = B_BINCHILD;
+            sprintf(infmsg, "       offset: -->  ADDIL %s,L%%%d\n", baseRegData, offset);
 
-        setGenRegister('B', opchar[2]);
+            codeAdr = codeAdr - 4;
+            createBINEntry();
+            ptr_b->b_type = 1;
+            ptr_b->b_lineNr = lineNr;
+            ptr_b->b_codeAdr = codeAdr;
+            ptr_b->b_binInstr = binInstr;
+            ptr_b->b_bin_status = bin_status;
+            strcpy(ptr_b->b_infotext, infmsg);
 
-        opnum[1] = 0;
-    }
+            codeAdr = codeAdr + 4;
+            binInstr = binInstrSave;
+            binInstr = binInstr & 0xFFFFFFF0;
+            strcpy(opchar[2], "R1");
+            sprintf(infmsg, "       offset: -->  <OPCODE> %s,R%%%d(R1)\n", opchar[0], offset);
+
+            setGenRegister('B', opchar[2]);
+
+            opnum[1] = 0;
+
+        }
+        if (AST_numInstr == 1) {
+            addInstrGlob = TRUE;
+            addInstrLine = TRUE;
+            updSYM(GlobalSYM, 0);
+        }
     int mask = pow(2, len) - 1;
-    num = (x & mask);
+    num = (offset & mask);
     setBit(27, num, len);
-
-
 }
+
+
+
+/// \brief Set an branch offset field for instruktion CBR, CBRU, GATE
+/// \details
+/// checks if offset exceeds the field width.
+/// 
+/// \param pos Position in the instruction.
+/// \param offset   Offset value.
+/// \param num Number of bits available for encoding.
+bool checkBranchOffset(int pos, int offset, int len) {
+    int num;
+    int limit = pow(2, len -1);
+    limit = limit * 4;          // due to shift >> 2
+    if (offset > 0) {
+        if (offset > (limit - 1)) {
+            snprintf(errmsg, sizeof(errmsg), "Offset %d out of range for this instruction limit = %d", offset, limit -1);
+            processError(errmsg);
+            return FALSE;
+        }
+    }
+    if (offset < 0) {
+        if (offset < (-limit)) {
+            snprintf(errmsg, sizeof(errmsg), "Offset %d out of range for this instruction limit = -%d", offset, limit);
+            processError(errmsg);
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+
+
 // ============================================================================
 // Register Encoding Helpers
 // ============================================================================
@@ -95,7 +147,7 @@ void setOffset(int pos, int x, int len) {
 /// \brief Encode a general-purpose register.
 /// \details
 /// Encodes register operands (R, A, or B) into the correct instruction fields.
-/// Only values between 1 and 15 are valid.
+/// Only values between 0 and 15 are valid.
 /// 
 /// \param reg     Register type ('R', 'A', or 'B').
 /// \param regname Name of the register, e.g., "R12".
@@ -115,7 +167,7 @@ void setGenRegister(int reg, char* regname) {
         t[1] = regname[2];
         value = 10 * (t[0] - 48) + (t[1] - 48);
     }
-    if (value < 1 || value > 15) {
+    if ( value > 15) {
         
         snprintf(errmsg, sizeof(errmsg), "General register # %d out of range", (int)value);
         processError(errmsg);
@@ -609,6 +661,7 @@ void genBinOption() {
 /// and special instructions.
 
 void genBinInstruction() {
+    int32_t num;
     switch (opInstrType) {
 
     /// @par ADD,ADC,AND,CMP,CMPU,OR,SBC,SUB,XOR
@@ -667,13 +720,13 @@ void genBinInstruction() {
 
                 strcpy(opchar[2], baseRegData);
                 setGenRegister('B', opchar[2]);
-                setOffset(27, opnum[1], 12);
+                setDataOffset(27, opnum[1], 12);
 
             } else if (operandTyp[1] == OT_MEMLOC) {
 
                 strcpy(opchar[2], "R15");
                 setGenRegister('B', opchar[2]);
-                setOffset(27, opnum[1], 12);
+                setDataOffset(27, opnum[1], 12);
 
             } else if (operandTyp[1] == OT_VALUE) {
 
@@ -691,7 +744,8 @@ void genBinInstruction() {
     case ADDIL:
     case LDIL:
         setGenRegister('R', opchar[0]);
-        setBit(31, opnum[1], 22);
+        num = opnum[1];
+        setBit(31, num, 22);
         break;
 
     case B:
@@ -717,13 +771,23 @@ void genBinInstruction() {
             if (symFound == TRUE) {
 
                 value = symcodeAdr - codeAdr + 4;
+                if (checkBranchOffset(31, value, 21) == TRUE) {
 
-                if ((value % 4) != 0) {
-                    snprintf(errmsg, sizeof(errmsg), "Label %s not on word boundary", opchar[0]);
+                    if ((value % 4) != 0) {
+                        snprintf(errmsg, sizeof(errmsg), "Label %s not on word boundary", opchar[0]);
+                        processError(errmsg);
+                    }
+                    value = value >> 2;
+                    if (value < 0) {
+                        binInstr = binInstr | 0x3fffff;  // ensure offset is neagtive
+                    }
+                    setBit(31, value, 22);
+                }
+                else {
+                    snprintf(errmsg, sizeof(errmsg), "offset too big");
                     processError(errmsg);
                 }
-                value = value >> 2;
-                setBit(31, value, 22);
+                
             }
             else
             {
@@ -767,14 +831,22 @@ void genBinInstruction() {
             searchSymLevel(currentSymSave, opchar[1], 0);
             if (symFound == TRUE) {
                 value = symcodeAdr - codeAdr + 4;
+                if (checkBranchOffset(31, value, 21) == TRUE) {
 
-
-                if ((value % 4) != 0) {
-                    snprintf(errmsg, sizeof(errmsg), "Label %s not on word boundary", opchar[1]);
+                    if ((value % 4) != 0) {
+                        snprintf(errmsg, sizeof(errmsg), "Label %s not on word boundary", opchar[0]);
+                        processError(errmsg);
+                    }
+                    value = value >> 2;
+                    if (value < 0) {
+                        binInstr = binInstr | 0x3fffff;  // ensure offset is neagtive
+                    }
+                    setBit(31, value, 22);
+                }
+                else {
+                    snprintf(errmsg, sizeof(errmsg), "offset too big");
                     processError(errmsg);
                 }
-                value = value >> 2;
-                setBit(31, value, 22);
             }
             else
             {
@@ -821,20 +893,31 @@ void genBinInstruction() {
 
             searchSymLevel(currentSymSave, opchar[2], 0);
             if (symFound == TRUE) {
-                value = symcodeAdr - codeAdr + 4 ;
+                value = symcodeAdr - codeAdr + 4;
+                if (checkBranchOffset(13, value, 16) == TRUE) {
 
-                if ((value % 4) != 0) {
-                    snprintf(errmsg, sizeof(errmsg), "Label %s not on word boundary", opchar[2]);
+                    if ((value % 4) != 0) {
+
+                        snprintf(errmsg, sizeof(errmsg), "Label %s not on word boundary", opchar[0]);
+                        processError(errmsg);
+                    }
+                    value = value >> 2;
+                    if (value < 0) {
+                        binInstr = binInstr | 0xffff << 8;  // ensure offset is neagtive
+                    }
+                    setBit(23, value, 16);
+                }
+                else {
+                    snprintf(errmsg, sizeof(errmsg), "offset too big");
                     processError(errmsg);
                 }
-                value = value >> 2;
-                setBit(23, value, 16);
             }
             else
             {
                 snprintf(errmsg, sizeof(errmsg), "Label %s not found", opchar[2]);
                 processError(errmsg);
             }
+            
         }
         if (DBG_GENBIN) {
 
@@ -910,7 +993,7 @@ void genBinInstruction() {
 
             strcpy(opchar[2], baseRegData);
             setGenRegister('B', opchar[2]);
-            setOffset(27, opnum[1], 12);
+            setDataOffset(27, opnum[1], 12);
         }
         if (opchar[2][0] == 'S') {
             value = getSegRegister(opchar[2]);
@@ -933,7 +1016,7 @@ void genBinInstruction() {
 
         if (operandTyp[0] == OT_VALUE) {
 
-
+            checkBranchOffset(23, value, 14);
             setBit(23, opnum[0] >> 2, 14);
 
 
@@ -1022,14 +1105,14 @@ void genBinInstruction() {
 
             strcpy(opchar[2], baseRegData);
             setGenRegister('B', opchar[2]);
-            setOffset(27, opnum[1], 18);
+            setDataOffset(27, opnum[1], 18);
 
         }
         else if (operandTyp[1] == OT_MEMLOC) {
 
             strcpy(opchar[2], "R15");
             setGenRegister('B', opchar[2]);
-            setOffset(27, opnum[1], 18);
+            setDataOffset(27, opnum[1], 18);
 
         }
         else if (operandTyp[1] == OT_VALUE) {
@@ -1141,7 +1224,7 @@ void genBinInstruction() {
 
             strcpy(opchar[2], baseRegData);
             setGenRegister('B', opchar[2]);
-            setOffset(27, opnum[1], 12);
+            setDataOffset(27, opnum[1], 12);
         }
         else {
             setGenRegister('A', opchar[1]);
@@ -1176,7 +1259,7 @@ void genBinInstruction() {
 
             strcpy(opchar[2], baseRegData);
             setGenRegister('B', opchar[2]);
-            setOffset(27, opnum[1], 12);
+            setDataOffset(27, opnum[1], 12);
         }
         else {
             setGenRegister('A', opchar[1]);
@@ -1191,7 +1274,29 @@ void genBinInstruction() {
         break;
     }
 
+    // write instruction in BINList
+    createBINEntry();
+
+    ptr_b->b_type = 1;
+    ptr_b->b_lineNr = lineNr;
+    ptr_b->b_codeAdr = codeAdr;
+    ptr_b->b_binInstr = binInstr;
+    ptr_b->b_bin_status = bin_status;
+    strcpy(ptr_b->b_infotext, infmsg);
+    numOfInstructions++;
+    if (bin_status == B_BINCHILD) {
+        codeAdr = codeAdr + 4;
+    }
+    bin_status = B_BIN;
+    
+
+    
+    
+    /*
+    /// insert Binary in SRC output
     createBinary();
+
+    /// append binary in ELF code section
     elfCode[0] = (binInstr >> 24) & 0xFF;
     elfCode[1] = (binInstr >> 16) & 0xFF;
     elfCode[2] = (binInstr >> 8) & 0xFF;
@@ -1199,7 +1304,7 @@ void genBinInstruction() {
     addTextSectionData();
     numOfInstructions++;
     bin_status = B_BIN; 
-    
+    */
 }
 
 /// \brief Finalize and insert a binary instruction.
@@ -1221,14 +1326,14 @@ void createBinary() {
         if (node == NULL) {
             fatalError("malloc failed");
         }
-        node->type = SRC_BIN;
-        node->linenr = lineNr;
-        node->binStatus = bin_status;
-        node->binInstr = binInstr;
-        node->codeAdr = codeAdr - 4;
-        node->text = strdup(infmsg);
+        node->s_type = SRC_BIN;
+        node->s_lineNr = lineNr;
+        node->s_binStatus = bin_status;
+        node->s_binInstr = binInstr;
+        node->s_codeAdr = codeAdr;
+        node->s_text = strdup(infmsg);
         node->children = NULL;
-        node->childCount = 0;
+        node->s_childCount = 0;
         SRCbin = node;
 
         addSRCchild(SRCcurrent, SRCbin);
@@ -1241,6 +1346,132 @@ void createBinary() {
     return;
     
 }
+
+// --------------------------------------------------------------------------------
+//  BIN List Management
+// --------------------------------------------------------------------------------
+
+/// \brief Create a new BIN list entry.
+/// \details
+/// Adds a new node to the global BIN list.  
+/// If the list is empty, the first node is allocated and set as `start_b`.  
+/// If the list already exists, the new node is appended at the end.
+void createBINEntry() {
+    if (start_b == NULL) {  // Insert first element
+        start_b = (struct BINList*)malloc(sizeof(struct BINList));
+
+        if (start_b == NULL) {
+
+            fatalError("malloc failed");
+        }
+        start_b->next = NULL;
+        ptr_b = start_b;
+    }
+    else {  // At least one element already exists
+
+        ptr_b = start_b;
+        while (ptr_b->next != NULL) {
+
+            ptr_b = ptr_b->next;
+        }
+
+        ptr_b->next = (struct BINList*)malloc(sizeof(struct BINList));
+        if (ptr_b->next == NULL) {
+
+            printf("Memory allocation failed for BIN List\n");
+            return;
+        }
+        ptr_b = ptr_b->next;
+        ptr_b->next = NULL;
+    }
+}
+
+/// \brief process BIN list 
+/// \details
+/// reads bin list and creates ELF structure and content and SRC output.  
+void processBIN() {
+
+    ptr_b = start_b;
+
+    while (ptr_b != NULL) {
+    
+        // process instructions
+        if (ptr_b->b_type == 1) {
+            binInstr = ptr_b->b_binInstr;
+            lineNr = ptr_b->b_lineNr;
+            codeAdr = ptr_b->b_codeAdr;
+            bin_status = ptr_b->b_bin_status;
+            if (bin_status == B_BINCHILD) {
+
+                strcpy(infmsg, ptr_b->b_infotext);
+            }
+            
+
+            /// insert Binary in SRC output
+            createBinary();
+
+            /// append binary in ELF code section
+            elfCode[0] = (binInstr >> 24) & 0xFF;
+            elfCode[1] = (binInstr >> 16) & 0xFF;
+            elfCode[2] = (binInstr >> 8) & 0xFF;
+            elfCode[3] = binInstr & 0xFF;
+            addTextSectionData();
+            numOfInstructions++;
+            bin_status = B_BIN;
+
+        }
+
+        // process CODE Sections
+        if (ptr_b->b_type == 2) {
+            elfCodeAddr = ptr_b->b_addr;
+            createTextSegment();
+            strcpy(buffer, ".text.");
+            strcat(buffer, ptr_b->b_name);
+            createTextSection(buffer);
+            addTextSectionToSegment();
+            // update number of instructions in old segment
+            
+            for (int i = 0; i < numSegment; i++) {
+                if ((strcmp(table[i].name, currentSegment) == 0) &&
+                   (table[i].type = 'T'))
+                {
+                    table[i].len = numOfInstructions*4;
+                }
+            }
+            
+            // add textsegment address to segment table
+            addSegmentEntry(numSegment, ptr_b->b_name, 'T', ptr_b->b_addr, -1);
+            strcpy(currentSegment, ptr_b->b_name);
+            numSegment++;
+
+            numOfInstructions = 0;
+        }
+
+        if (ptr_b != NULL) {
+            ptr_b = ptr_b->next;
+        }
+    }
+}
+
+/// \brief delete BIN list 
+/// \details
+/// deletes entire bin list.
+void deleteBIN() {
+ 
+    struct BINList* curr = start_b;
+    struct BINList* next;
+
+    while (curr != NULL) {
+        next = curr->next;  // Save pointer to next node
+        free(curr);         // Free current node
+        curr = next;        // Move to next node
+    }
+
+
+
+}
+
+
 
 // ============================================================================
 // AST Processing
@@ -1256,16 +1487,18 @@ void createBinary() {
 
 void processAST(ASTNode* node, int depth) {
 
+
     if (!node) return;
 
-    strcpy(currentScopeName, node->scopeName);
-    currentScopeLevel = node->scopeLevel;
+    strcpy(currentScopeName, node->a_scopeName);
+    currentScopeLevel = node->a_scopeLevel;
 
     SymNode* currentSym = node->symNodeAdr;
     
-    codeAdr = node->codeAdr;
+    AST_numInstr = node->a_numInstr;
 
-    switch (node->type) {
+    // printf("Nodetype %d Linener %d\n", node->type, node->lineNr);
+    switch (node->a_type) {
 
 
         case NODE_PROGRAM: 
@@ -1278,9 +1511,21 @@ void processAST(ASTNode* node, int depth) {
                 if (nodeTypeOld == NODE_INSTRUCTION) {
                     genBinOption();
                     genBinInstruction();
-
+                    
+                    
                 }
                 else if (nodeTypeOld == NODE_CODE) {
+
+                    // write code in BINList
+                    createBINEntry();
+                    ptr_b->b_type = 2;
+                    ptr_b->b_lineNr = node->a_lineNr;
+                    strcpy(ptr_b->b_name, label);
+                    ptr_b->b_addr = elfCodeAddr;
+                    ptr_b->b_numOfInstructions = numOfInstructions;
+                    ptr_b->b_entry = elfEntryPoint;
+
+/*
                     // create ELF structure
                     createTextSegment();
                     strcpy(buffer, ".text.");
@@ -1291,9 +1536,11 @@ void processAST(ASTNode* node, int depth) {
                     // add textsegment address to segment table
                     addSegmentEntry(numSegment, labelCodeOld, 'T', elfCodeAddrOld, numOfInstructions * 4);
                     numSegment++;
+*/
                     numOfInstructions = 0;
                     // codeAdr = 0;
                     elfCodeAddrOld = elfCodeAddr;
+                    codeAdr = elfCodeAddr;
                     strcpy(labelCodeOld, label);
                     codeExist = TRUE;
                 }
@@ -1302,22 +1549,27 @@ void processAST(ASTNode* node, int depth) {
             opCount = 0;
             optCount = 0;
             mode = 0;
+
             for (int i = 0; i < 5; i++) {
                 strcpy(opchar[i], "");
                 opnum[i] = 0;
             }
-            nodeTypeOld = node->type;
-
+            nodeTypeOld = node->a_type;
             strcpy(option[0], "");
             strcpy(option[1], "");
             currentSymSave = currentSym;
-            binInstr = node->valnum;
-            lineNr = node->lineNr;
+            binInstr = node->a_valnum;
+            lineNr = node->a_lineNr;
+            if (addInstrLine == TRUE) {
+                node->a_numInstr = 2;
+            }
             codeInstrFlag = TRUE;
             break;
 
 
         case NODE_CODE:
+
+
             if (codeInstrFlag == TRUE) {
 
                 if (nodeTypeOld == NODE_INSTRUCTION) {
@@ -1327,6 +1579,16 @@ void processAST(ASTNode* node, int depth) {
                 }
                 else if (nodeTypeOld == NODE_CODE) {
 
+                    // write code in BINList
+                    createBINEntry();
+                    ptr_b->b_type = 2;
+                    ptr_b->b_lineNr = node->a_lineNr;
+                    strcpy(ptr_b->b_name, labelCodeOld);
+                    ptr_b->b_addr = elfCodeAddrOld;
+                    ptr_b->b_numOfInstructions = numOfInstructions;
+                    ptr_b->b_entry = elfEntryPoint;
+
+/*                  
                     // create ELF structure
                     createTextSegment();
                     strcpy(buffer, ".text.");
@@ -1334,30 +1596,30 @@ void processAST(ASTNode* node, int depth) {
                     createTextSection(buffer);
                     addTextSectionToSegment();
 
-
-
                     // add textsegment address to segment table
                     addSegmentEntry(numSegment, labelCodeOld, 'T', elfCodeAddrOld, numOfInstructions*4);
-                    elfCodeAddrOld = elfCodeAddr;
-                    strcpy(labelCodeOld, label);
                     numSegment++;
-                    // codeAdr = 0;
+*/
                     numOfInstructions = 0;
+                    // codeAdr = 0;
+                    elfCodeAddrOld = elfCodeAddr;
+                    codeAdr = elfCodeAddr;
+                    strcpy(labelCodeOld, label);
                     codeExist = TRUE;
                 }
+            }
 
-             }
-            nodeTypeOld = node->type;
+            nodeTypeOld = node->a_type;
             codeInstrFlag = TRUE;
             break;
         
         case NODE_ADDR:
-            elfCodeAddr = node->valnum;
+            elfCodeAddr = node->a_valnum;
 
             break;
 
         case NODE_ALIGN:
-            elfCodeAlign = node->valnum;
+            elfCodeAlign = node->a_valnum;
             break;
 
         case NODE_ENTRY:
@@ -1365,7 +1627,7 @@ void processAST(ASTNode* node, int depth) {
             break;
 
         case NODE_LABEL: 
-            strcpy(label, node->value);
+            strcpy(label, node->a_value);
 
             break;
 
@@ -1374,26 +1636,26 @@ void processAST(ASTNode* node, int depth) {
             break;
     
         case NODE_OPTION: 
-            strcpy(option[optCount], node->value);
+            strcpy(option[optCount], node->a_value);
             optCount++;
             break;
 
         case NODE_OPERATION: 
-            opInstrType = node->valnum;
+            opInstrType = node->a_valnum;
             break;
         
         case NODE_OPERAND: 
             //printf("Operand %s %d  Opcount %d\n", node->value, node->valnum, opCount);
-            strcpy(opchar[opCount], node->value);
-            opnum[opCount] = node->valnum;
-            operandTyp[opCount] = node->operandType;
-            strcpy(baseRegData, node->basereg);
+            strcpy(opchar[opCount], node->a_value);
+            opnum[opCount] = node->a_valnum;
+            operandTyp[opCount] = node->a_operandType;
+            strcpy(baseRegData, node->a_baseReg);
             opCount++;
             break;
         
         case NODE_MODE:
 
-            mode = node->valnum;
+            mode = node->a_valnum;
             // now we can populate the instruction
             break;
 
@@ -1402,14 +1664,7 @@ void processAST(ASTNode* node, int depth) {
             processError(errmsg);
     }
 
-
-       
-    // cgMode --> bit 12,13
-
-       
-
-
-    for (int i = 0; i < node->childCount; i++) {
+    for (int i = 0; i < node->a_childCount; i++) {
         processAST(node->children[i], depth + 1);
     }
 }

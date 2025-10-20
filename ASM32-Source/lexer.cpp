@@ -25,24 +25,26 @@ void createTokenEntry() {
         start_t = (struct tokenList*)malloc(sizeof(struct tokenList));
 
         if (start_t == NULL) {
+
             fatalError("malloc failed");
         }
         start_t->next = NULL;
         ptr_t = start_t;
     }
     else {  // At least one element already exists
-        ptr_t = start_t;
 
+        ptr_t = start_t;
         while (ptr_t->next != NULL) {
+        
             ptr_t = ptr_t->next;
         }
 
         ptr_t->next = (struct tokenList*)malloc(sizeof(struct tokenList));
         if (ptr_t->next == NULL) {
+            
             printf("Memory allocation failed for Token List\n");
             return;
         }
-
         ptr_t = ptr_t->next;
         ptr_t->next = NULL;
     }
@@ -62,9 +64,9 @@ void printTokenList() {
 
         struct tokenList* ptr_t = start_t;
         while (ptr_t != NULL) {
-            printf("%d\t%d\t", ptr_t->lineNumber, ptr_t->column);
-            printTokenCode(ptr_t->tokTyp);
-            printf("\t%s\n", ptr_t->token);
+            printf("%d\t%d\t", ptr_t->t_lineNr, ptr_t->t_column);
+            printTokenCode(ptr_t->t_tokTyp);
+            printf("\t%s\n", ptr_t->t_token);
             ptr_t = ptr_t->next;
         }
     }
@@ -96,6 +98,8 @@ void createToken() {
     strcpy(token, "\0");        ///< Reset token buffer.
     int j = 0;                  ///< Token character index.
     tokTyp = NONE;              ///< Default token type.
+    uint32_t n;
+    char* endptr;
 
     while (TRUE) {
         ch = sl[ind];
@@ -104,7 +108,7 @@ void createToken() {
         // End of line
         if (ch == '\n' || ch == ';') {
             tokTyp = T_EOL;
-            strcpy(token, "EOL");
+            strcpy(token, "");
             break;
         }
         // Punctuation and operators
@@ -153,9 +157,12 @@ void createToken() {
                 ch = sl[ind];
             }
             token[j] = '\0';
-            int n = atoi(token);
-            n &= 0xFFFFFC00;
-            snprintf(token, sizeof(token), "%d", n);
+            // int32_t n = atoi(token);
+            // ??? statt mask ein shift >> 10
+
+            n = (uint32_t) strtoul(token, &endptr, 10);
+            n = n >> 10;
+            snprintf(token, sizeof(token), "%u", n);
             ind--;
             break;
         }
@@ -170,9 +177,9 @@ void createToken() {
                 ch = sl[ind];
             }
             token[j] = '\0';
-            int n = atoi(token);
+            n = (uint32_t)strtoul(token, &endptr, 10);
             n &= 0x3FF;
-            snprintf(token, sizeof(token), "%d", n);
+            snprintf(token, sizeof(token), "%u", n);
             ind--;
             break;
         }
