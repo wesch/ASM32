@@ -805,11 +805,9 @@ int main(int argc, char** argv) {
 
     if (!sourceERR) {
         addNote();
-        char path[MAX_FILE_NAME_LENGTH];
-        extract_path(SourceFileName, path, sizeof(path));
-        strcat(path, "\\ASM32.out");
-        printf("\n\nELF File: %s\n", path);
-        writeElfFile(path);
+        char output[MAX_FILE_NAME_LENGTH];
+        changeExtension2Out(SourceFileName, output, sizeof(output));
+        writeElfFile(output);
 
         if (DBG_ELF == TRUE) {
             printf("\n\n+------------------------------------------------------------------------------------+\n");

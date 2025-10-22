@@ -1,7 +1,7 @@
 ; ======================================
 ; Example program ASM32 Bootstrap Mode
 ; ======================================
-; Test long branch 
+; Test large offset
 ; ======================================                  
 
                     .GLOBAL 

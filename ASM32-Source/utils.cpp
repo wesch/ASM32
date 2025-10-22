@@ -34,6 +34,36 @@ void closeSourceFile() {
     fclose(inputFile);
 }
 
+
+void changeExtension2Out(const char* input, char* output, size_t out_size) {
+    strncpy(output, input, out_size - 1);
+    output[out_size - 1] = '\0';
+    char* dot = strrchr(output, '.');
+
+    // Check that the dot is not part of a directory (e.g., "/home.v1/test")
+    // Find last slash or backslash
+    const char* slash = strrchr(output, '/');
+    const char* backslash = strrchr(output, '\\');
+    const char* sep = slash;
+    if (backslash && (!sep || backslash > sep))
+        sep = backslash;
+
+    if (dot && (!sep || dot > sep)) {
+        // Valid extension found, replace it
+        *dot = '\0';
+    }
+
+    // Append ".out"
+    if (strlen(output) + 4 < out_size)
+        strcat(output, ".out");
+    else
+        fprintf(stderr, "Warning: output buffer too small\n");
+}
+
+
+
+/// \brief extract path information from file pathe 
+/// 
 void extract_path(const char* fullpath, char* path_out, size_t out_size) {
     const char* last_slash = strrchr(fullpath, '/');
     const char* last_backslash = strrchr(fullpath, '\\');
@@ -110,6 +140,9 @@ void processWarning(const char* msg) {
     addSRCchild(SRCcurrent, SRCerror);
 }
 
+
+/// \brief Reports a info encountered during processing.
+/// \param msg The info message to record.
 void processInfo(const char* msg) {
     strcpy(buffer, msg);
     strcat(buffer, "\n");

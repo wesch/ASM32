@@ -302,6 +302,7 @@ void printSegmentTable(int count);
 void openSourceFile();
 void closeSourceFile();
 void extract_path(const char* fullpath, char* path_out, size_t out_size);
+void changeExtension2Out(const char* input, char* output, size_t out_size);
 void fatalError(const char* msg);
 int  isunderline(char ch);
 void processError(const char* msg);
